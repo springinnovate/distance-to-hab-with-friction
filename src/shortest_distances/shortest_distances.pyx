@@ -33,7 +33,8 @@ def find_shortest_distances(
     band = raster.GetRasterBand(raster_path_band[1])
     print('opening %s' % str(raster_path_band))
     raster_array = band.ReadAsArray(
-        xoff=xoff, yoff=yoff, win_xsize=win_xsize, win_ysize=win_ysize)
+        xoff=xoff, yoff=yoff, win_xsize=win_xsize,
+        win_ysize=win_ysize).astype(numpy.double)
 
     for i in range(win_xsize):
         for j in range(win_ysize):
