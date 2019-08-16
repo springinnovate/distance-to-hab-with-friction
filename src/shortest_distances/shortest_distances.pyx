@@ -25,8 +25,9 @@ def find_shortest_distances(
         ?
 
     """
+    start_time = time.time()
     cdef int n = win_xsize*win_ysize
-    cdef double[:, :] diagonals = numpy.empty((8, n))
+    cdef double[:, :] diagonals = numpy.zeros((8, n))
     cdef int[:] diagonal_offsets = numpy.array([
         -win_xsize-1, -win_xsize, -win_xsize+1, -1, 1,
         win_xsize-1, win_xsize, win_xsize+1], dtype=numpy.int)
@@ -37,10 +38,8 @@ def find_shortest_distances(
     band = raster.GetRasterBand(raster_path_band[1])
     print('opening %s' % str(raster_path_band))
 
-    cdef double cell_length = abs(
-        pygeoprocessing.get_raster_info(
-            raster_path_band[0])['pixel_size'][0])
-    cdef double diagonal_cell_length = (2**0.5)*cell_length
+    cdef double cell_length = 1.0
+    cdef double diagonal_cell_length = 2**0.5
 
     raster_array = band.ReadAsArray(
         xoff=xoff, yoff=yoff, win_xsize=win_xsize,
@@ -51,43 +50,58 @@ def find_shortest_distances(
     # 3 x 4
     # 5 6 7
 
-    for i in range(win_xsize):
-        for j in range(win_ysize):
-            center_val = raster_array[j, i]
-            flat_index = j*win_xsize+i
-            if i > 0 and j > 0:
-                diagonals[0][diagonal_offsets[0] + flat_index-win_xsize-1] = (
-                    diagonal_cell_length * (
-                        raster_array[j-1, i-1] + center_val) / 2.0)
-            if j > 0:
-                diagonals[1][diagonal_offsets[0] + flat_index-win_xsize] = (
-                    cell_length * (
-                        raster_array[j-1, i] + center_val) / 2.0)
-            if j > 0 and i < win_xsize - 1:
-                diagonals[2][diagonal_offsets[0] + flat_index-win_xsize+1] = (
-                    diagonal_cell_length * (
-                        raster_array[j-1, i+1] + center_val) / 2.0)
-            if i > 0:
-                diagonals[3][diagonal_offsets[0] + flat_index-1] = (
-                    cell_length * (
-                        raster_array[j, i-1] + center_val) / 2.0)
-            if i < win_xsize - 1:
-                diagonals[4][diagonal_offsets[0] + flat_index+1] = (
-                    cell_length * (
-                        raster_array[j, i+1] + center_val) / 2.0)
-            if j < win_ysize-1 and i > 0:
-                diagonals[5][diagonal_offsets[0] + flat_index+win_xsize-1] = (
-                    diagonal_cell_length * (
-                        raster_array[j+1, i-1] + center_val) / 2.0)
-            if j < win_ysize-1:
-                diagonals[6][diagonal_offsets[0] + flat_index+win_xsize] = (
-                    cell_length * (
-                        raster_array[j+1, i] + center_val) / 2.0)
-            if j < win_ysize-1 and i < win_xsize - 1:
-                diagonals[7][diagonal_offsets[0] + flat_index+win_xsize+1] = (
-                    diagonal_cell_length * (
-                        raster_array[j+1, i+1] + center_val) / 2.0)
+    try:
+        for i in range(win_xsize):
+            for j in range(win_ysize):
+                center_val = raster_array[j, i]
+                flat_index = j*win_xsize+i
+                if i > 0 and j > 0:
+                    diagonals[0][diagonal_offsets[0] + flat_index-win_xsize-1] = (
+                        diagonal_cell_length * (
+                            raster_array[j-1, i-1] + center_val) / 2.0)
+                if j > 0:
+                    diagonals[1][diagonal_offsets[1] + flat_index-win_xsize] = (
+                        cell_length * (
+                            raster_array[j-1, i] + center_val) / 2.0)
+                if j > 0 and i < win_xsize - 1:
+                    diagonals[2][diagonal_offsets[2] + flat_index-win_xsize+1] = (
+                        diagonal_cell_length * (
+                            raster_array[j-1, i+1] + center_val) / 2.0)
+                if i > 0:
+                    diagonals[3][diagonal_offsets[3] + flat_index-1] = (
+                        cell_length * (
+                            raster_array[j, i-1] + center_val) / 2.0)
+                if i < win_xsize - 1:
+                    diagonals[4][diagonal_offsets[4] + flat_index+1] = (
+                        cell_length * (
+                            raster_array[j, i+1] + center_val) / 2.0)
+                if j < win_ysize-1 and i > 0:
+                    diagonals[5][diagonal_offsets[5] + flat_index+win_xsize-1] = (
+                        diagonal_cell_length * (
+                            raster_array[j+1, i-1] + center_val) / 2.0)
+                if j < win_ysize-1:
+                    diagonals[6][diagonal_offsets[6] + flat_index+win_xsize] = (
+                        cell_length * (
+                            raster_array[j+1, i] + center_val) / 2.0)
+                if j < win_ysize-1 and i < win_xsize - 1:
+                    diagonals[7][diagonal_offsets[7] + flat_index+win_xsize+1] = (
+                        diagonal_cell_length * (
+                            raster_array[j+1, i+1] + center_val) / 2.0)
+    except:
+        print('win_xsize: %d %d %d %d %d' % (
+            win_xsize, diagonal_offsets[6], i, j, flat_index))
+        raise
+
+#        win_xsize: 16 16 0 14 224
+    dist_matrix = scipy.sparse.dia_matrix((
+        diagonals, diagonal_offsets), shape=(n, n))
+    distances = scipy.sparse.csgraph.shortest_path(
+        dist_matrix, method='auto', directed=False)
+    print(numpy.array(diagonals))
+    print(distances)
+    print('total time on %d elements: %s', win_xsize, time.time() - start_time)
     """
+
     dist_matrix = scipy.sparse.csc_matrix(
         (([1], ([0], [1]))), (array.size, array.size))
     print('making distances')
