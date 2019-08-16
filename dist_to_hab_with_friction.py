@@ -9,6 +9,8 @@ import ecoshard
 import taskgraph
 import scipy.sparse.csgraph
 
+import shortest_distances
+
 RASTER_ECOSHARD_URL_MAP = {
 #    'copernicus_hab': 'https://storage.googleapis.com/ecoshard-root/working-shards/masked_nathab_copernicus_md5_420bad770184ce40f028c9c9e02ace4c.tif',
 #    'esa_hab': 'https://storage.googleapis.com/ecoshard-root/working-shards/masked_nathab_esa_md5_40577bae3ef60519b1043bb8582a07af.tif',
@@ -49,8 +51,10 @@ def main():
         #     target_path_list=[raster_path],
         #     task_name='fetch %s' % raster_url)
         ecoshard_path_map[raster_id] = raster_path
+
+    # extract out that country layer and reproject to a UTM zone.
     for i in range(4, 10):
-        find_shortest_distances(
+        shortest_distances.find_shortest_distances(
             (ecoshard_path_map['friction_surface'], 1),
             10000, 10000, 2**i, 2**i)
     task_graph.close()
@@ -80,11 +84,11 @@ def find_shortest_distances(
         xoff=xoff, yoff=yoff, win_xsize=win_xsize, win_ysize=win_ysize)
     print(win_ysize)
     dist_matrix = scipy.sparse.csc_matrix(
-        (array.size, array.size))
+        (([1], ([0], [1]))), (array.size, array.size))
     print('making distances')
     start_time = time.time()
-    distances = scipy.sparse.csgraph.floyd_warshall(
-        dist_matrix, directed=False)
+    distances = scipy.sparse.csgraph.shortest_path(
+        dist_matrix, method='auto', directed=False)
     print(distances)
     print('total time: %s', time.time() - start_time)
 
