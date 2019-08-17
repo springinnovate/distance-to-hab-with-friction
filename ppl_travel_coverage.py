@@ -4,7 +4,10 @@ import os
 import logging
 import sys
 
+import numpy
 from osgeo import gdal
+from osgeo import osr
+from osgeo import ogr
 import ecoshard
 import taskgraph
 import scipy.sparse.csgraph
@@ -57,8 +60,27 @@ def main():
 
     world_borders_layer.SetAttributeFilter("NAME = 'Bhutan'")
 
-    for feature in world_borders_layer:
-        LOGGER.debug(feature.GetField('NAME'))
+    for country_feature in world_borders_layer:
+        country_name = country_feature.GetField('NAME')
+        fid = country_feature.GetFID()
+        LOGGER.debug(country_name)
+        country_geom = country_feature.GetGeometryRef()
+        # find EPSG code that would be central to the country
+        centroid_geom = country_geom.Centroid()
+        utm_code = (numpy.floor((centroid_geom.GetX()+180)/6) % 60)+1
+        lat_code = 6 if centroid_geom.GetY() > 0 else 7
+        epsg_code = int('32%d%02d' % (lat_code, utm_code))
+
+        country_vector_path = os.path.join(
+            WORKSPACE_DIR, '%s.gpkg' % country_name)
+        extract_country_task = task_graph.add_task(
+            func=extract_and_project_feature,
+            args=(
+                ecoshard_path_map['world_borders'], fid, epsg_code,
+                country_vector_path),
+            target_path_list=[country_vector_path],
+            task_name='make local watershed for %s' % country_name)
+        extract_country_task.join()
         continue
         # extract out that country layer and reproject to a UTM zone.
         n_size = 200
@@ -99,6 +121,55 @@ def find_shortest_distances(
     print(distances)
     print('total time: %s', time.time() - start_time)
 
+
+def extract_and_project_feature(
+        vector_path, feature_id, epsg_code, target_vector_path):
+    """Make a local projection of a single feature in a vector.
+
+    Parameters:
+        vector_path (str): base vector in WGS84 coordinates.
+        feature_id (int): FID for the feature to extract.
+        epsg_code (str): EPSG code to project feature to.
+        target_gpkg_vector_path (str): path to new GPKG vector that will
+            contain only that feature.
+
+    Returns:
+        None.
+    """
+
+    vector = gdal.OpenEx(vector_path, gdal.OF_VECTOR)
+    layer = vector.GetLayer()
+    feature = layer.GetFeature(feature_id)
+    geom = feature.GetGeometryRef()
+
+    epsg_srs = osr.SpatialReference()
+    epsg_srs.ImportFromEPSG(epsg_code)
+
+    base_srs = layer.GetSpatialRef()
+    base_to_utm = osr.CoordinateTransformation(base_srs, epsg_srs)
+
+    # clip out watershed to its own file
+    # create a new shapefile
+    if os.path.exists(target_vector_path):
+        os.remove(target_vector_path)
+    driver = ogr.GetDriverByName('GPKG')
+    target_vector = driver.CreateDataSource(
+        target_vector_path)
+    target_layer = target_vector.CreateLayer(
+        os.path.splitext(os.path.basename(target_vector_path))[0],
+        epsg_srs, ogr.wkbPolygon)
+    layer_defn = target_layer.GetLayerDefn()
+    feature_geometry = geom.Clone()
+    base_feature = ogr.Feature(layer_defn)
+    feature_geometry.Transform(base_to_utm)
+    base_feature.SetGeometry(feature_geometry)
+    target_layer.CreateFeature(base_feature)
+    target_layer.SyncToDisk()
+    geom = None
+    feature_geometry = None
+    base_feature = None
+    target_layer = None
+    target_vector = None
 
 if __name__ == '__main__':
     main()
