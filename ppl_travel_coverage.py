@@ -25,6 +25,9 @@ WORKSPACE_DIR = 'workspace_dist_to_hab_with_friction'
 CHURN_DIR = os.path.join(WORKSPACE_DIR, 'churn')
 ECOSHARD_DIR = os.path.join(WORKSPACE_DIR, 'ecoshard')
 TARGET_NODATA = -1
+MAX_TRAVEL_TIME = 4*60  # minutes
+MAX_TRAVEL_DISTANCE = 20000  # meters
+
 
 logging.basicConfig(
     level=logging.DEBUG,
@@ -115,12 +118,12 @@ def main():
             dependent_task_list=[extract_country_task],
             target_path_list=wgs84_raster_path_list,
             task_name='project for %s' % country_name)
-        utm_raster_path_list = [
-            os.path.join(
-                country_workspace, 'utm_%s_friction.tif' % country_name),
-            os.path.join(
-                country_workspace, 'utm_%s_population.tif' % country_name)
-        ]
+        utm_friction_path = os.path.join(
+            country_workspace, 'utm_%s_friction.tif' % country_name)
+        utm_population_path = os.path.join(
+            country_workspace, 'utm_%s_population.tif' % country_name)
+        utm_raster_path_list = [utm_friction_path, utm_population_path]
+
         m_per_deg = length_of_degree(centroid_geom.GetY())
         target_pixel_size = (
             m_per_deg*friction_raster_info['pixel_size'][0],
@@ -142,8 +145,15 @@ def main():
                 },
             },
             dependent_task_list=[clip_task],
-            target_path_list=wgs84_raster_path_list,
+            target_path_list=utm_raster_path_list,
             task_name='project for %s' % country_name)
+
+        people_access_path = os.path.join(
+            country_workspace, 'people_access.tif')
+        people_access(
+            utm_friction_path, utm_population_path, MAX_TRAVEL_TIME,
+            MAX_TRAVEL_DISTANCE, people_access_path)
+
         continue
         # extract out that country layer and reproject to a UTM zone.
         n_size = 200
@@ -151,6 +161,36 @@ def main():
             (ecoshard_path_map['friction_surface'], 1),
             10000, 10000, n_size, n_size)
     task_graph.close()
+
+
+def people_access(
+        friction_raster_path, population_raster_path,
+        max_travel_time, max_travel_distance, target_people_access_path):
+    """Construct a people access raster showing where people can reach.
+
+    The people access raster will have a value of population count per pixel
+    which can reach that pixel within a cutoff of `max_travel_time` or
+    `max_travel_distance`.
+
+    Parameters:
+        friction_raster_path (str): path to a raster whose units are
+            meters/minute required to cross any given pixel. Values of 0 are
+            treated as impassible.
+        population_raster_path (str): path to a per-pixel population count
+            raster.
+        max_travel_time (float): the maximum amount of time in minutes to
+            allow when determining where population can travel to.
+        max_travel_distance (float): the maximum distance to allow for when
+            determining where population can travel to.
+        target_people_access_path (str): raster created by this call that
+            will contain the count of population that can reach any given
+            pixel within the travel time and travel distance constraints.
+
+    Returns:
+        None.
+
+    """
+    pass
 
 
 def find_shortest_distances(
