@@ -94,7 +94,6 @@ def find_shortest_distances(
             win_xsize, diagonal_offsets[6], i, j, flat_index))
         raise
 
-#        win_xsize: 16 16 0 14 224
     dist_matrix = scipy.sparse.dia_matrix((
         diagonals, diagonal_offsets), shape=(n, n))
     numpy.set_printoptions(
