@@ -126,6 +126,8 @@ def main():
             m_per_deg*friction_raster_info['pixel_size'][0],
             m_per_deg*friction_raster_info['pixel_size'][1])
         LOGGER.debug(target_pixel_size)
+        # this will project values outside to 0 since there's not a nodata
+        # value defined
         projection_task = task_graph.add_task(
             func=pygeoprocessing.align_and_resize_raster_stack,
             args=(
@@ -136,7 +138,7 @@ def main():
                 'base_vector_path_list': [country_vector_path],
                 'target_sr_wkt': epsg_srs.ExportToWkt(),
                 'vector_mask_options': {
-                    'mask_vector_path':
+                    'mask_vector_path': country_vector_path,
                 },
             },
             dependent_task_list=[clip_task],
