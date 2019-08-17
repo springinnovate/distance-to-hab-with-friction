@@ -33,7 +33,6 @@ def find_shortest_distances(
         win_xsize-1, win_xsize, win_xsize+1], dtype=numpy.int)
     cdef double[:, :] raster_array
     cdef int i, j
-
     raster = gdal.OpenEx(raster_path_band[0])
     band = raster.GetRasterBand(raster_path_band[1])
     print('opening %s' % str(raster_path_band))
@@ -45,6 +44,9 @@ def find_shortest_distances(
         xoff=xoff, yoff=yoff, win_xsize=win_xsize,
         win_ysize=win_ysize).astype(numpy.double)
 
+    print(n)
+    print(numpy.array(diagonals))
+    print(numpy.array(raster_array))
     # local cell numbering scheme
     # 0 1 2
     # 3 x 4
@@ -56,35 +58,35 @@ def find_shortest_distances(
                 center_val = raster_array[j, i]
                 flat_index = j*win_xsize+i
                 if i > 0 and j > 0:
-                    diagonals[0][diagonal_offsets[0] + flat_index-win_xsize-1] = (
+                    diagonals[0][flat_index-win_xsize-1] = (
                         diagonal_cell_length * (
                             raster_array[j-1, i-1] + center_val) / 2.0)
                 if j > 0:
-                    diagonals[1][diagonal_offsets[1] + flat_index-win_xsize] = (
+                    diagonals[1][flat_index-win_xsize] = (
                         cell_length * (
                             raster_array[j-1, i] + center_val) / 2.0)
                 if j > 0 and i < win_xsize - 1:
-                    diagonals[2][diagonal_offsets[2] + flat_index-win_xsize+1] = (
+                    diagonals[2][flat_index-win_xsize+1] = (
                         diagonal_cell_length * (
                             raster_array[j-1, i+1] + center_val) / 2.0)
                 if i > 0:
-                    diagonals[3][diagonal_offsets[3] + flat_index-1] = (
+                    diagonals[3][flat_index-1] = (
                         cell_length * (
                             raster_array[j, i-1] + center_val) / 2.0)
                 if i < win_xsize - 1:
-                    diagonals[4][diagonal_offsets[4] + flat_index+1] = (
+                    diagonals[4][flat_index+1] = (
                         cell_length * (
                             raster_array[j, i+1] + center_val) / 2.0)
                 if j < win_ysize-1 and i > 0:
-                    diagonals[5][diagonal_offsets[5] + flat_index+win_xsize-1] = (
+                    diagonals[5][flat_index+win_xsize-1] = (
                         diagonal_cell_length * (
                             raster_array[j+1, i-1] + center_val) / 2.0)
                 if j < win_ysize-1:
-                    diagonals[6][diagonal_offsets[6] + flat_index+win_xsize] = (
+                    diagonals[6][flat_index+win_xsize] = (
                         cell_length * (
                             raster_array[j+1, i] + center_val) / 2.0)
                 if j < win_ysize-1 and i < win_xsize - 1:
-                    diagonals[7][diagonal_offsets[7] + flat_index+win_xsize+1] = (
+                    diagonals[7][flat_index+win_xsize+1] = (
                         diagonal_cell_length * (
                             raster_array[j+1, i+1] + center_val) / 2.0)
     except:
@@ -95,9 +97,11 @@ def find_shortest_distances(
 #        win_xsize: 16 16 0 14 224
     dist_matrix = scipy.sparse.dia_matrix((
         diagonals, diagonal_offsets), shape=(n, n))
+    numpy.set_printoptions(
+        threshold=numpy.inf, linewidth=numpy.inf, precision=3)
+    print(dist_matrix.toarray())
     distances = scipy.sparse.csgraph.shortest_path(
         dist_matrix, method='auto', directed=False)
-    print(numpy.array(diagonals))
     print(distances)
     print('total time on %d elements: %s', win_xsize, time.time() - start_time)
     """

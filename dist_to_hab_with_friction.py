@@ -53,7 +53,7 @@ def main():
         ecoshard_path_map[raster_id] = raster_path
 
     # extract out that country layer and reproject to a UTM zone.
-    for i in range(4, 10):
+    for i in range(2, 3):
         shortest_distances.find_shortest_distances(
             (ecoshard_path_map['friction_surface'], 1),
             10000, 10000, 2**i, 2**i)
