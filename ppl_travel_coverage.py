@@ -4,6 +4,7 @@ import os
 import logging
 import sys
 
+import pygeoprocessing
 import numpy
 from osgeo import gdal
 from osgeo import osr
@@ -60,6 +61,8 @@ def main():
 
     world_borders_layer.SetAttributeFilter("NAME = 'Bhutan'")
 
+    friction_raster_info = pygeoprocessing.get_raster_info(
+        ecoshard_path_map['friction_surface'])
     for country_feature in world_borders_layer:
         country_name = country_feature.GetField('NAME')
         fid = country_feature.GetFID()
@@ -70,9 +73,16 @@ def main():
         utm_code = (numpy.floor((centroid_geom.GetX()+180)/6) % 60)+1
         lat_code = 6 if centroid_geom.GetY() > 0 else 7
         epsg_code = int('32%d%02d' % (lat_code, utm_code))
-
+        LOGGER.debug(epsg_code)
+        epsg_srs = osr.SpatialReference()
+        epsg_srs.ImportFromEPSG(epsg_code)
+        country_workspace = os.path.join(WORKSPACE_DIR, country_name)
+        try:
+            os.makedirs(country_workspace)
+        except OSError:
+            pass
         country_vector_path = os.path.join(
-            WORKSPACE_DIR, '%s.gpkg' % country_name)
+            country_workspace, '%s.gpkg' % country_name)
         extract_country_task = task_graph.add_task(
             func=extract_and_project_feature,
             args=(
@@ -81,6 +91,57 @@ def main():
             target_path_list=[country_vector_path],
             task_name='make local watershed for %s' % country_name)
         extract_country_task.join()
+
+        base_raster_path_list = [
+            ecoshard_path_map['friction_surface'],
+            ecoshard_path_map['population_layer'],
+        ]
+        wgs84_raster_path_list = [
+            os.path.join(
+                country_workspace, 'wgs84_%s_friction.tif' % country_name),
+            os.path.join(
+                country_workspace, 'wgs84_%s_population.tif' % country_name)
+        ]
+        clip_task = task_graph.add_task(
+            func=pygeoprocessing.align_and_resize_raster_stack,
+            args=(
+                base_raster_path_list, wgs84_raster_path_list,
+                ['near']*len(base_raster_path_list),
+                friction_raster_info['pixel_size'], 'intersection'),
+            kwargs={
+                'base_vector_path_list': [country_vector_path],
+                'target_sr_wkt': friction_raster_info['projection']
+                },
+            dependent_task_list=[extract_country_task],
+            target_path_list=wgs84_raster_path_list,
+            task_name='project for %s' % country_name)
+        utm_raster_path_list = [
+            os.path.join(
+                country_workspace, 'utm_%s_friction.tif' % country_name),
+            os.path.join(
+                country_workspace, 'utm_%s_population.tif' % country_name)
+        ]
+        m_per_deg = length_of_degree(centroid_geom.GetY())
+        target_pixel_size = (
+            m_per_deg*friction_raster_info['pixel_size'][0],
+            m_per_deg*friction_raster_info['pixel_size'][1])
+        LOGGER.debug(target_pixel_size)
+        projection_task = task_graph.add_task(
+            func=pygeoprocessing.align_and_resize_raster_stack,
+            args=(
+                wgs84_raster_path_list, utm_raster_path_list,
+                ['near']*len(base_raster_path_list),
+                target_pixel_size, 'intersection'),
+            kwargs={
+                'base_vector_path_list': [country_vector_path],
+                'target_sr_wkt': epsg_srs.ExportToWkt(),
+                'vector_mask_options': {
+                    'mask_vector_path':
+                },
+            },
+            dependent_task_list=[clip_task],
+            target_path_list=wgs84_raster_path_list,
+            task_name='project for %s' % country_name)
         continue
         # extract out that country layer and reproject to a UTM zone.
         n_size = 200
@@ -135,8 +196,8 @@ def extract_and_project_feature(
 
     Returns:
         None.
-    """
 
+    """
     vector = gdal.OpenEx(vector_path, gdal.OF_VECTOR)
     layer = vector.GetLayer()
     feature = layer.GetFeature(feature_id)
@@ -170,6 +231,25 @@ def extract_and_project_feature(
     base_feature = None
     target_layer = None
     target_vector = None
+
+
+def length_of_degree(lat):
+    """Calculate the length of a degree in meters."""
+    m1 = 111132.92
+    m2 = -559.82
+    m3 = 1.175
+    m4 = -0.0023
+    p1 = 111412.84
+    p2 = -93.5
+    p3 = 0.118
+    lat_rad = lat * numpy.pi / 180
+    latlen = (
+        m1 + m2 * numpy.cos(2 * lat_rad) + m3 * numpy.cos(4 * lat_rad) +
+        m4 * numpy.cos(6 * lat_rad))
+    longlen = abs(
+        p1 * numpy.cos(lat_rad) + p2 * numpy.cos(3 * lat_rad) + p3 * numpy.cos(5 * lat_rad))
+    return max(latlen, longlen)
+
 
 if __name__ == '__main__':
     main()
