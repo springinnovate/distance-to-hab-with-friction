@@ -207,7 +207,8 @@ def people_access(
     # `buffer_i/j` is the upper left hand corner of the window that will be
     # read in to process all pairs least cost paths
     # buffer size is the number of pixels to pad all around the window
-    buffer_array = numpy.array((buffer_size, buffer_size))
+    buffer_array = numpy.empty((
+        window_size + 2*buffer_size, window_size + 2*buffer_size))
     for window_j in range(0, ny, window_size):
         buffer_j = window_j - buffer_size
         buffer_ysize = window_size + 2*buffer_size
@@ -234,8 +235,8 @@ def people_access(
             # 0,0 to buffer_xsize, buffer_ysize is the default
             LOGGER.debug(window_size+buffer_size*2)
             LOGGER.debug(
-                '%d: %d-%d, %d: %d-%d', window_i, local_i, buffer_xsize,
-                window_j, local_j, buffer_ysize)
+                '%d: %d-%d, %d: %d-%d .. %s', window_i, local_i, buffer_xsize,
+                window_j, local_j, buffer_ysize, buffer_array.shape)
             #buffer_array[local_j:buffer_ysize, local_i:buffer_xsize]
 
 
