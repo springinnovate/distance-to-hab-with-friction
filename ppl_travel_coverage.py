@@ -12,11 +12,9 @@ import scipy.sparse.csgraph
 import shortest_distances
 
 RASTER_ECOSHARD_URL_MAP = {
-#    'copernicus_hab': 'https://storage.googleapis.com/ecoshard-root/working-shards/masked_nathab_copernicus_md5_420bad770184ce40f028c9c9e02ace4c.tif',
-#    'esa_hab': 'https://storage.googleapis.com/ecoshard-root/working-shards/masked_nathab_esa_md5_40577bae3ef60519b1043bb8582a07af.tif',
-    # friction layer units: minutes/meter, min=0.0005, max=87.3075
     'friction_surface': 'https://storage.googleapis.com/ecoshard-root/critical_natural_capital/friction_surface_2015_v1.0-002_md5_166d17746f5dd49cfb2653d721c2267c.tif',
-    #'population_layer': r'https://storage.googleapis.com/ecoshard-root/lspop2017_md5_86d653478c1d99d4c6e271bad280637d.tif'
+    'population_layer': r'https://storage.googleapis.com/ecoshard-root/lspop2017_md5_86d653478c1d99d4c6e271bad280637d.tif'
+    'world_borders': r'https://storage.googleapis.com/ecoshard-root/critical_natural_capital/TM_WORLD_BORDERS-0.3_simplified_md5_47f2059be8d4016072aa6abe77762021.gpkg'
 }
 
 WORKSPACE_DIR = 'workspace_dist_to_hab_with_friction'
@@ -43,21 +41,31 @@ def main():
     task_graph = taskgraph.TaskGraph(CHURN_DIR, -1, 5.0)
     ecoshard_path_map = {}
     # download hab mask and ppl fed equivalent raster
-    for raster_id, raster_url in RASTER_ECOSHARD_URL_MAP.items():
-        raster_path = os.path.join(ECOSHARD_DIR, os.path.basename(raster_url))
-        # _ = task_graph.add_task(
-        #     func=ecoshard.download_url,
-        #     args=(raster_url, raster_path),
-        #     target_path_list=[raster_path],
-        #     task_name='fetch %s' % raster_url)
-        ecoshard_path_map[raster_id] = raster_path
-
-    # extract out that country layer and reproject to a UTM zone.
-    shortest_distances.find_shortest_distances(
-        (ecoshard_path_map['friction_surface'], 1),
-        10000, 10000, 10, 10)
-    task_graph.close()
+    for data_id, data_url in RASTER_ECOSHARD_URL_MAP.items():
+        raster_path = os.path.join(ECOSHARD_DIR, os.path.basename(data_url))
+        _ = task_graph.add_task(
+            func=ecoshard.download_url,
+            args=(data_url, raster_path),
+            target_path_list=[raster_path],
+            task_name='fetch %s' % data_url)
+        ecoshard_path_map[data_id] = raster_path
     task_graph.join()
+
+    world_borders_vector = gdal.OpenEx(
+        ecoshard_path_map['world_borders'], gdal.OF_VECTOR)
+    world_borders_layer = world_borders_vector.GetLayer()
+
+    world_borders_layer.SetAttributeFilter("NAME = 'Bhutan'")
+
+    for feature in world_borders_layer:
+        LOGGER.debug(feature.GetField('NAME'))
+        continue
+        # extract out that country layer and reproject to a UTM zone.
+        n_size = 200
+        shortest_distances.find_shortest_distances(
+            (ecoshard_path_map['friction_surface'], 1),
+            10000, 10000, n_size, n_size)
+    task_graph.close()
 
 
 def find_shortest_distances(

@@ -51,58 +51,39 @@ def find_shortest_distances(
     # 0 1 2
     # 3 x 4
     # 5 6 7
-
-    try:
-        for i in range(win_xsize):
-            for j in range(win_ysize):
-                center_val = raster_array[j, i]
-                flat_index = j*win_xsize+i
-                if i > 0 and j > 0:
-                    diagonals[0][flat_index-win_xsize-1] = (
-                        diagonal_cell_length * (
-                            raster_array[j-1, i-1] + center_val) / 2.0)
-                if j > 0:
-                    diagonals[1][flat_index-win_xsize] = (
-                        cell_length * (
-                            raster_array[j-1, i] + center_val) / 2.0)
-                if j > 0 and i < win_xsize - 1:
-                    diagonals[2][flat_index-win_xsize+1] = (
-                        diagonal_cell_length * (
-                            raster_array[j-1, i+1] + center_val) / 2.0)
-                if i > 0:
-                    diagonals[3][flat_index-1] = (
-                        cell_length * (
-                            raster_array[j, i-1] + center_val) / 2.0)
-                if i < win_xsize - 1:
-                    diagonals[4][flat_index+1] = (
-                        cell_length * (
-                            raster_array[j, i+1] + center_val) / 2.0)
-                if j < win_ysize-1 and i > 0:
-                    diagonals[5][flat_index+win_xsize-1] = (
-                        diagonal_cell_length * (
-                            raster_array[j+1, i-1] + center_val) / 2.0)
-                if j < win_ysize-1:
-                    diagonals[6][flat_index+win_xsize] = (
-                        cell_length * (
-                            raster_array[j+1, i] + center_val) / 2.0)
-                if j < win_ysize-1 and i < win_xsize - 1:
-                    diagonals[7][flat_index+win_xsize+1] = (
-                        diagonal_cell_length * (
-                            raster_array[j+1, i+1] + center_val) / 2.0)
-    except:
-        print('win_xsize: %d %d %d %d %d' % (
-            win_xsize, diagonal_offsets[6], i, j, flat_index))
-        raise
+    # there's symmetry in this structure since it's fully connected so
+    # on each element we connect to elements 2, 4, 6, and 7 only
+    for i in range(win_xsize):
+        for j in range(win_ysize):
+            center_val = raster_array[j, i]
+            flat_index = j*win_xsize+i
+            if j > 0 and i < win_xsize - 1:
+                diagonals[2][flat_index-win_xsize+1] = (
+                    diagonal_cell_length * (
+                        raster_array[j-1, i+1] + center_val) / 2.0)
+            if i < win_xsize - 1:
+                diagonals[4][flat_index+1] = (
+                    cell_length * (
+                        raster_array[j, i+1] + center_val) / 2.0)
+            if j < win_ysize-1:
+                diagonals[6][flat_index+win_xsize] = (
+                    cell_length * (
+                        raster_array[j+1, i] + center_val) / 2.0)
+            if j < win_ysize-1 and i < win_xsize - 1:
+                diagonals[7][flat_index+win_xsize+1] = (
+                    diagonal_cell_length * (
+                        raster_array[j+1, i+1] + center_val) / 2.0)
 
     dist_matrix = scipy.sparse.dia_matrix((
         diagonals, diagonal_offsets), shape=(n, n))
-    numpy.set_printoptions(
-        threshold=numpy.inf, linewidth=numpy.inf, precision=3)
-    print(dist_matrix.toarray())
+    # numpy.set_printoptions(
+    #     threshold=numpy.inf, linewidth=numpy.inf, precision=3)
+    # print(dist_matrix.toarray())
+    print('calculate distances')
     distances = scipy.sparse.csgraph.shortest_path(
         dist_matrix, method='auto', directed=False)
-    print(distances)
     print('total time on %d elements: %s', win_xsize, time.time() - start_time)
+    print(distances)
     """
 
     dist_matrix = scipy.sparse.csc_matrix(
