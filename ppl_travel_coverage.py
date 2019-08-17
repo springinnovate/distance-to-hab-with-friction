@@ -25,8 +25,12 @@ WORKSPACE_DIR = 'workspace_dist_to_hab_with_friction'
 CHURN_DIR = os.path.join(WORKSPACE_DIR, 'churn')
 ECOSHARD_DIR = os.path.join(WORKSPACE_DIR, 'ecoshard')
 TARGET_NODATA = -1
+
+# max travel time in minutes, basing off of half of a travel day (roundtrip)
 MAX_TRAVEL_TIME = 4*60  # minutes
-MAX_TRAVEL_DISTANCE = 20000  # meters
+
+# max travel distance to cutoff simulation
+MAX_TRAVEL_DISTANCE = 40000
 
 
 logging.basicConfig(
@@ -154,12 +158,6 @@ def main():
             utm_friction_path, utm_population_path, MAX_TRAVEL_TIME,
             MAX_TRAVEL_DISTANCE, people_access_path)
 
-        continue
-        # extract out that country layer and reproject to a UTM zone.
-        n_size = 200
-        shortest_distances.find_shortest_distances(
-            (ecoshard_path_map['friction_surface'], 1),
-            10000, 10000, n_size, n_size)
     task_graph.close()
 
 
@@ -190,7 +188,65 @@ def people_access(
         None.
 
     """
-    pass
+    pygeoprocessing.new_raster_from_base(
+        population_raster_path, target_people_access_path, gdal.GDT_Int32,
+        [-1], fill_value_list=[-1])
+    friction_raster_info = pygeoprocessing.get_raster_info(
+        friction_raster_path)
+    max_travel_distance_in_pixels = (
+        max_travel_distance / friction_raster_info['pixel_size'][0])
+    LOGGER.debug(max_travel_distance_in_pixels*4)
+    window_size = int(max_travel_distance_in_pixels*2)
+    buffer_size = int(max_travel_distance_in_pixels)
+    nx, ny = friction_raster_info['raster_size']
+
+    # `window_i/j` is the upper left hand coordinate of the valid travel
+    # distance block that will be calculated
+    # `window_size` is the number of pixels w/h that will have valid travel
+    # calculations from the `window_i/j` coordinate
+    # `buffer_i/j` is the upper left hand corner of the window that will be
+    # read in to process all pairs least cost paths
+    # buffer size is the number of pixels to pad all around the window
+    buffer_array = numpy.array((buffer_size, buffer_size))
+    for window_j in range(0, ny, window_size):
+        buffer_j = window_j - buffer_size
+        buffer_ysize = window_size + 2*buffer_size
+        local_j = 0
+        if buffer_j < 0:
+            buffer_ysize += buffer_j
+            local_j -= buffer_j
+            buffer_j = 0
+        if buffer_j + buffer_ysize >= ny:
+            buffer_ysize = ny - buffer_j
+        for window_i in range(0, nx, window_size):
+            buffer_i = window_i - buffer_size
+            local_i = 0
+            buffer_xsize = window_size + 2*buffer_size
+            if buffer_i < 0:
+                buffer_xsize += buffer_i
+                local_i -= buffer_i
+                buffer_i = 0
+            if buffer_i + buffer_xsize >= nx:
+                buffer_xsize = nx - buffer_i
+
+            buffer_array[:] = numpy.inf
+            # what are the buffer array bounds?
+            # 0,0 to buffer_xsize, buffer_ysize is the default
+            LOGGER.debug(window_size+buffer_size*2)
+            LOGGER.debug(
+                '%d: %d-%d, %d: %d-%d', window_i, local_i, buffer_xsize,
+                window_j, local_j, buffer_ysize)
+            #buffer_array[local_j:buffer_ysize, local_i:buffer_xsize]
+
+
+    return
+    # extract out that country layer and reproject to a UTM zone.
+    n_size = 200
+    shortest_distances.find_shortest_distances(
+
+        friction_raster_path, population_raster_path, target_people_access_path
+        (ecoshard_path_map['friction_surface'], 1),
+        10000, 10000, n_size, n_size)
 
 
 def find_shortest_distances(
