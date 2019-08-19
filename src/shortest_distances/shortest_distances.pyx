@@ -80,7 +80,7 @@ def find_shortest_distances(numpy.ndarray[double, ndim=2] friction_array):
     # print(dist_matrix.toarray())
     print('calculate distances')
     distances = scipy.sparse.csgraph.shortest_path(
-        dist_matrix, method='auto', directed=False)
+        dist_matrix, method='D', directed=False)
     print('total time on %d elements: %s', win_xsize, time.time() - start_time)
     print(distances)
     """
