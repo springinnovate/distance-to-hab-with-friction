@@ -222,6 +222,9 @@ def people_access(
             raster_y = 0
         if raster_y + raster_win_ysize > ny:
             raster_win_ysize = ny - raster_y
+        core_y_size = core_size
+        if core_y + core_y_size > raster_y:
+            core_y_size = raster_y - core_y
         for core_x in range(0, nx, core_size):
             raster_x = core_x - core_size
             raster_x_offset = 0
@@ -232,7 +235,8 @@ def people_access(
                 raster_x = 0
             if raster_x + raster_win_xsize > nx:
                 raster_win_xsize = nx - raster_x
-
+            if core_x + core_x_size > raster_x:
+                core_x_size = raster_x - core_x
             friction_array[:] = numpy.nan
             LOGGER.debug(
                 '%d:(%d)%d(%d), %d:(%d)%d(%d)',
@@ -260,7 +264,8 @@ def people_access(
                 friction_array, population_array, cell_length, core_size,
                 core_size, core_size, MAX_TRAVEL_DISTANCE)
             people_access_band.WriteArray(
-                population_reach, xoff=core_x, yoff=core_y)
+                population_reach[0:core_y_size, 0:core_x_size],
+                xoff=core_x, yoff=core_y)
 
 
 def find_shortest_distances(
