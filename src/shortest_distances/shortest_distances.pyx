@@ -12,7 +12,7 @@ cimport numpy
 def find_population_reach(
         numpy.ndarray[double, ndim=2] friction_array,
         numpy.ndarray[double, ndim=2] population_array,
-        double cell_length, int core_x, core_y, core_size,
+        double cell_length, int core_x, int core_y, int core_size,
         double max_dist):
     """Define later
 
@@ -91,10 +91,26 @@ def find_population_reach(
     #     threshold=numpy.inf, linewidth=numpy.inf, precision=3)
     # print(dist_matrix.toarray())
     print('calculate distances')
-    distances = scipy.sparse.csgraph.shortest_path(
+    cdef numpy.ndarray[double, ndim=2] distances = scipy.sparse.csgraph.shortest_path(
         dist_matrix, method='D', directed=False)
     print('total time on %d elements: %s', win_xsize, time.time() - start_time)
     print(distances)
+
+    cdef numpy.ndarray[double, ndim=2] population_reach = numpy.empty(
+        (core_size, core_size))
+    cdef int core_flat_index
+    cdef double population_count
+    for core_x in range(core_size):
+        print('calculating population count %d' % core_x)
+        for core_y in range(core_size):
+            core_flat_index = (core_y+core_size)*win_xsize+core_size
+            population_count = 0
+            for i in range(win_xsize):
+                for j in range(win_ysize):
+                    flat_index = j*win_xsize+i
+                    if distances[flat_index, core_flat_index] < max_dist:
+                        population_count += population_array[j, i]
+            population_reach[core_y, core_x] = population_count
     """
 
     dist_matrix = scipy.sparse.csc_matrix(
