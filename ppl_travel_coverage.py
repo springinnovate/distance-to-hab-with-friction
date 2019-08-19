@@ -195,59 +195,44 @@ def people_access(
         friction_raster_path)
     max_travel_distance_in_pixels = (
         max_travel_distance / friction_raster_info['pixel_size'][0])
-    LOGGER.debug(max_travel_distance_in_pixels*4)
-    window_size = int(max_travel_distance_in_pixels*2)
-    buffer_size = int(max_travel_distance_in_pixels)
+    core_size = int(max_travel_distance_in_pixels*2)
     nx, ny = friction_raster_info['raster_size']
-
-    # `window_i/j` is the upper left hand coordinate of the valid travel
-    # distance block that will be calculated
-    # `window_size` is the number of pixels w/h that will have valid travel
-    # calculations from the `window_i/j` coordinate
-    # `buffer_i/j` is the upper left hand corner of the window that will be
-    # read in to process all pairs least cost paths
-    # buffer size is the number of pixels to pad all around the window
-    buffer_array = numpy.empty((
-        window_size + 2*buffer_size, window_size + 2*buffer_size))
-    for window_j in range(0, ny, window_size):
-        buffer_j = window_j - buffer_size
-        buffer_ysize = window_size + 2*buffer_size
-        local_j = 0
-        if buffer_j < 0:
-            buffer_ysize += buffer_j
-            local_j -= buffer_j
-            buffer_j = 0
-        if buffer_j + buffer_ysize >= ny:
-            buffer_ysize = ny - buffer_j
-        for window_i in range(0, nx, window_size):
-            buffer_i = window_i - buffer_size
-            local_i = 0
-            buffer_xsize = window_size + 2*buffer_size
-            if buffer_i < 0:
-                buffer_xsize += buffer_i
-                local_i -= buffer_i
-                buffer_i = 0
-            if buffer_i + buffer_xsize >= nx:
-                buffer_xsize = nx - buffer_i
+    LOGGER.debug('%d %d', nx, ny)
+    buffer_array = numpy.empty((core_size*2, core_size*2))
+    for core_y in range(0, ny, core_size):
+        raster_y = core_y - core_size
+        raster_y_offset = 0
+        raster_win_ysize = core_size*2
+        if raster_y < 0:
+            raster_y_offset = abs(raster_y)
+            raster_win_ysize += raster_y
+            raster_y = 0
+        if raster_y + raster_win_ysize > ny:
+            raster_win_ysize = ny - raster_y
+        for core_x in range(0, nx, core_size):
+            raster_x = core_x - core_size
+            raster_x_offset = 0
+            raster_win_xsize = core_size*2
+            if raster_x < 0:
+                raster_x_offset = abs(raster_x)
+                raster_win_xsize += raster_x
+                raster_x = 0
+            if raster_x + raster_win_xsize > nx:
+                raster_win_xsize = nx - raster_x
 
             buffer_array[:] = numpy.inf
-            # what are the buffer array bounds?
-            # 0,0 to buffer_xsize, buffer_ysize is the default
-            LOGGER.debug(window_size+buffer_size*2)
             LOGGER.debug(
-                '%d: %d-%d, %d: %d-%d .. %s', window_i, local_i, buffer_xsize,
-                window_j, local_j, buffer_ysize, buffer_array.shape)
-            #buffer_array[local_j:buffer_ysize, local_i:buffer_xsize]
-
-
-    return
-    # extract out that country layer and reproject to a UTM zone.
-    n_size = 200
-    shortest_distances.find_shortest_distances(
-
-        friction_raster_path, population_raster_path, target_people_access_path
-        (ecoshard_path_map['friction_surface'], 1),
-        10000, 10000, n_size, n_size)
+                '%d:(%d)%d(%d), %d:(%d)%d(%d)',
+                raster_y, core_y, raster_win_ysize, raster_y_offset,
+                raster_x, core_x, raster_win_xsize, raster_x_offset)
+            # buffer_array[core_y:buffer_ysize, local_x:buffer_xsize]
+            continue
+            shortest_distances.find_shortest_distances(
+                friction_raster_path, population_raster_path,
+                target_people_access_path,
+                raster_x, buffer_xsize, local_x, window_i, window_i_buffer,
+                raster_y, buffer_ysize, core_y, window_j, window_j_buffer,
+                (core_size + 2*buffer_size, core_size + 2*buffer_size))
 
 
 def find_shortest_distances(

@@ -8,12 +8,38 @@ import numpy
 
 cimport numpy
 
+shortest_distances.find_shortest_distances(
+                friction_raster_path, population_raster_path,
+                target_people_access_path,
+                raster_i, local_i, buffer_xsize,
+                raster_j, local_j, buffer_ysize,
+                (window_size + 2*buffer_size, window_size + 2*buffer_size))
+
 
 def find_shortest_distances(
-        raster_path_band, xoff, yoff, win_xsize, win_ysize):
-    """Find shortest distances in a subgrid of raster_path.
+        friction_raster_path, population_raster_path, aggregate_raster_path,
+        raster_xoff, raster_xsize, buffer_i, buffer_xsize, window_i, window_i_buffer_size,
+        raster_yoff, raster_ysize, buffer_j, buffer_ysize, window_j, window_j_buffer_size,
+        buffer_shape):
+    """Define later
 
     Parameters:
+        friction_raster_path (str): friction in m/min of movement through a
+            pixel
+        population_raster_path (str): population count per pixel
+        aggregate_raster_path (str): modified by this call in the window of
+            raster_xoff/raster_yoff -> buffer_xsize/buffer_ysize.
+        raster_xoff/yoff (int): offset to start reading friction layer.
+        buffer_xsize/buffer_ysize (int): xy/window sizes to read from friction
+            layer
+        buffer_i/buffer_j (int): i/j location that will contain valid
+            source points.
+        window_i/window_j (int):
+        window_i_buffer_size
+        window_j_buffer_size
+
+
+
         raster_path_band (tuple): raster path band index tuple.
         xoff, yoff, xwin_size, ywin_size (int): rectangle that defines
             upper left hand corner and size of a subgrid to extract from
