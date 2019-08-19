@@ -134,8 +134,8 @@ def find_population_reach(
         for core_j in range(core_size):
             # the core x/y starts halfway in on the cor length of the raster
             # window, so adding those in directly into the flat index.
-            core_flat_index = core_i+core_size//2 + (
-                core_j+core_size//2)*win_xsize
+            core_flat_index = core_i + core_x + (
+                core_j + core_y)*win_xsize
             population_count = 0.0
             for i in range(win_xsize):
                 for j in range(win_ysize):

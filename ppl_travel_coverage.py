@@ -27,7 +27,7 @@ ECOSHARD_DIR = os.path.join(WORKSPACE_DIR, 'ecoshard')
 TARGET_NODATA = -1
 
 # max travel time in minutes, basing off of half of a travel day (roundtrip)
-MAX_TRAVEL_TIME = 4^60  # minutes
+MAX_TRAVEL_TIME = 8*60  # minutes
 
 # max travel distance to cutoff simulation
 MAX_TRAVEL_DISTANCE = 20000
