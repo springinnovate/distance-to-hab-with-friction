@@ -56,6 +56,8 @@ def find_population_reach(
     # on each element we connect to elements 2, 4, 6, and 7 only
     for i in range(win_xsize):
         for j in range(win_ysize):
+            if i == j:
+                continue
             center_val = friction_array[j, i]
             if center_val != center_val:  # it's NaN so skip
                 continue
@@ -91,8 +93,9 @@ def find_population_reach(
     #     threshold=numpy.inf, linewidth=numpy.inf, precision=3)
     # print(dist_matrix.toarray())
     print('calculate distances')
-    cdef numpy.ndarray[double, ndim=2] distances = scipy.sparse.csgraph.shortest_path(
-        dist_matrix, method='D', directed=False)
+    cdef numpy.ndarray[double, ndim=2] distances = (
+        scipy.sparse.csgraph.shortest_path(
+            dist_matrix, method='D', directed=False))
     print('total time on %d elements: %s', win_xsize, time.time() - start_time)
     print(distances)
 
@@ -102,22 +105,25 @@ def find_population_reach(
     cdef double population_count
     start_time = time.time()
     print('calculating population count %d' % core_x)
-    for core_x in range(core_size):
-        for core_y in range(core_size):
-            core_flat_index = (core_y+core_size)*win_xsize+core_size
+    print('unique population array: %s' % numpy.unique(population_array))
+    print('distance min max: %s %s' % (numpy.max(distances[distances != numpy.inf]), numpy.min(distances)))
+    for core_i in range(core_size):
+        for core_j in range(core_size):
+            # the core x/y starts halfway in on the cor length of the raster
+            # window, so adding those in directly into the flat index.
+            core_flat_index = core_i+core_size//2 + (
+                core_j+core_size//2)*win_xsize
             population_count = 0.0
             for i in range(win_xsize):
                 for j in range(win_ysize):
                     if i == j:
-                        population_count += population_array[
-                            j+core_y, i+core_x]
+                        population_count += population_array[j, i]
                     else:
                         flat_index = j*win_xsize+i
                         if distances[flat_index, core_flat_index] < max_dist:
-                            population_count += population_array[
-                                j+core_y, i+core_x]
+                            population_count += population_array[j, i]
             #print('population count ij: %f %d %d' % (population_count, i, j))
-            population_reach[core_y, core_x] = population_count
+            population_reach[core_j, core_i] = population_count
 
     print(
         'total time on determining pop elements %s', time.time() - start_time)
