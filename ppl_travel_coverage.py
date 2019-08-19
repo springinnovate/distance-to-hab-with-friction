@@ -193,12 +193,13 @@ def people_access(
         [-1], fill_value_list=[-1])
     friction_raster_info = pygeoprocessing.get_raster_info(
         friction_raster_path)
-    max_travel_distance_in_pixels = (
-        max_travel_distance / friction_raster_info['pixel_size'][0])
+    cell_length = friction_raster_info['pixel_size'][0]
+    max_travel_distance_in_pixels = max_travel_distance / cell_length
     core_size = int(max_travel_distance_in_pixels*2)
     nx, ny = friction_raster_info['raster_size']
     LOGGER.debug('%d %d', nx, ny)
     friction_array = numpy.empty((core_size*2, core_size*2))
+    population_array = numpy.empty((core_size*2, core_size*2))
     LOGGER.debug('friction array size: %s', friction_array.shape)
     for core_y in range(0, ny, core_size):
         raster_y = core_y - core_size
@@ -236,11 +237,25 @@ def people_access(
                 buf_obj=friction_array[
                     raster_y_offset:raster_y_offset+raster_win_ysize,
                     raster_x_offset:raster_x_offset+raster_win_xsize])
+            population_array[:] = 0.0
+            population_raster = gdal.OpenEx(
+                population_raster_path, gdal.OF_RASTER)
+            population_band = population_raster.GetRasterBand(1)
+            population_band.ReadAsArray(
+                xoff=raster_x, yoff=raster_y,
+                win_xsize=raster_win_xsize, win_ysize=raster_win_ysize,
+                buf_obj=population_array[
+                    raster_y_offset:raster_y_offset+raster_win_ysize,
+                    raster_x_offset:raster_x_offset+raster_win_xsize])
             LOGGER.debug(friction_array)
             # the nodata value is undefined but will present as 0.
             friction_array[numpy.isclose(friction_array, 0)] = numpy.nan
             # buffer_array[core_y:buffer_ysize, local_x:buffer_xsize]
-            shortest_distances.find_shortest_distances(friction_array)
+            shortest_distances.find_population_reach(
+                friction_array,
+                population_array,
+                cell_length, core_size, core_size, core_size,
+                MAX_TRAVEL_DISTANCE)
 
 
 def find_shortest_distances(

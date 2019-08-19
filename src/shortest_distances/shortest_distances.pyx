@@ -9,15 +9,28 @@ import numpy
 cimport numpy
 
 
-def find_shortest_distances(numpy.ndarray[double, ndim=2] friction_array):
+def find_population_reach(
+        numpy.ndarray[double, ndim=2] friction_array,
+        numpy.ndarray[double, ndim=2] population_array,
+        double cell_length, int core_x, core_y, core_size,
+        double max_dist):
     """Define later
 
     Parameters:
         friction_array (numpy.ndarray): array with friction values for
             determining lcp.
+        population_array (numpy.ndarray): array with population values per
+            pixel.
+        cell_length (double): length of cell in same units as max_dist
+        core_x/core_y (int): defines the ul corner of the core in friction
+            array
+        core_size (int): defines the w/h of the core slice in friction_array.
+        max_dist (double): the maximum distance allowed when computing
+            population reach.
 
     Returns:
-        ?
+        core_size 2D array of population reach starting at core_x/y on the
+        friction array.
 
     """
     start_time = time.time()
@@ -33,8 +46,7 @@ def find_shortest_distances(numpy.ndarray[double, ndim=2] friction_array):
         win_xsize-1, win_xsize, win_xsize+1], dtype=numpy.int)
     cdef int i, j
 
-    cdef double cell_length = 1.0
-    cdef double diagonal_cell_length = 2**0.5
+    cdef double diagonal_cell_length = 2**0.5 * cell_length
 
     # local cell numbering scheme
     # 0 1 2
