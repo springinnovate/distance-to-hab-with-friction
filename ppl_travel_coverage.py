@@ -263,6 +263,7 @@ def people_access(
             population_reach = shortest_distances.find_population_reach(
                 friction_array, population_array, cell_length, core_size,
                 core_size, core_size, MAX_TRAVEL_DISTANCE)
+            LOGGER.debug('population reach size: %s', population_reach.shape)
             people_access_band.WriteArray(
                 population_reach[0:core_y_size, 0:core_x_size],
                 xoff=core_x, yoff=core_y)
