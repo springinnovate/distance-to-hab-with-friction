@@ -198,7 +198,7 @@ def people_access(
     core_size = int(max_travel_distance_in_pixels*2)
     nx, ny = friction_raster_info['raster_size']
     LOGGER.debug('%d %d', nx, ny)
-    buffer_array = numpy.empty((core_size*2, core_size*2))
+    friction_array = numpy.empty((core_size*2, core_size*2))
     for core_y in range(0, ny, core_size):
         raster_y = core_y - core_size
         raster_y_offset = 0
@@ -220,19 +220,24 @@ def people_access(
             if raster_x + raster_win_xsize > nx:
                 raster_win_xsize = nx - raster_x
 
-            buffer_array[:] = numpy.inf
+            friction_array[:] = numpy.inf
             LOGGER.debug(
                 '%d:(%d)%d(%d), %d:(%d)%d(%d)',
                 raster_y, core_y, raster_win_ysize, raster_y_offset,
                 raster_x, core_x, raster_win_xsize, raster_x_offset)
+
+            friction_raster = gdal.OpenEx(
+                friction_raster_path, gdal.OF_RASTER)
+            friction_band = friction_raster.GetRasterBand(1)
+            friction_band.ReadAsArray(
+                xoff=raster_x, yoff=raster_y,
+                win_xsize=raster_win_xsize, win_ysize=raster_win_ysize,
+                buf_obj=friction_array[
+                    raster_y_offset:raster_y_offset+raster_win_ysize,
+                    raster_x_offset:raster_x_offset+raster_win_xsize])
+            LOGGER.debug(friction_array)
             # buffer_array[core_y:buffer_ysize, local_x:buffer_xsize]
-            continue
-            shortest_distances.find_shortest_distances(
-                friction_raster_path, population_raster_path,
-                target_people_access_path,
-                raster_x, buffer_xsize, local_x, window_i, window_i_buffer,
-                raster_y, buffer_ysize, core_y, window_j, window_j_buffer,
-                (core_size + 2*buffer_size, core_size + 2*buffer_size))
+            shortest_distances.find_shortest_distances(friction_array)
 
 
 def find_shortest_distances(
