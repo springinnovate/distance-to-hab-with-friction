@@ -199,6 +199,7 @@ def people_access(
     nx, ny = friction_raster_info['raster_size']
     LOGGER.debug('%d %d', nx, ny)
     friction_array = numpy.empty((core_size*2, core_size*2))
+    LOGGER.debug('friction array size: %s', friction_array.shape)
     for core_y in range(0, ny, core_size):
         raster_y = core_y - core_size
         raster_y_offset = 0
@@ -220,7 +221,7 @@ def people_access(
             if raster_x + raster_win_xsize > nx:
                 raster_win_xsize = nx - raster_x
 
-            friction_array[:] = numpy.inf
+            friction_array[:] = numpy.nan
             LOGGER.debug(
                 '%d:(%d)%d(%d), %d:(%d)%d(%d)',
                 raster_y, core_y, raster_win_ysize, raster_y_offset,
@@ -236,6 +237,8 @@ def people_access(
                     raster_y_offset:raster_y_offset+raster_win_ysize,
                     raster_x_offset:raster_x_offset+raster_win_xsize])
             LOGGER.debug(friction_array)
+            # the nodata value is undefined but will present as 0.
+            friction_array[numpy.isclose(friction_array, 0)] = numpy.nan
             # buffer_array[core_y:buffer_ysize, local_x:buffer_xsize]
             shortest_distances.find_shortest_distances(friction_array)
 
