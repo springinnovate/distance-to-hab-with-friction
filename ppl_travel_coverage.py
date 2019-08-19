@@ -189,8 +189,11 @@ def people_access(
 
     """
     pygeoprocessing.new_raster_from_base(
-        population_raster_path, target_people_access_path, gdal.GDT_Int32,
+        population_raster_path, target_people_access_path, gdal.GDT_Float32,
         [-1], fill_value_list=[-1])
+    people_access_raster = gdal.OpenEx(
+        target_people_access_path, gdal.OF_RASTER | gdal.GA_Update)
+    people_access_band = people_access_raster.GetRasterBand(1)
     friction_raster_info = pygeoprocessing.get_raster_info(
         friction_raster_path)
     cell_length = friction_raster_info['pixel_size'][0]
@@ -201,6 +204,14 @@ def people_access(
     friction_array = numpy.empty((core_size*2, core_size*2))
     population_array = numpy.empty((core_size*2, core_size*2))
     LOGGER.debug('friction array size: %s', friction_array.shape)
+
+    friction_raster = gdal.OpenEx(
+        friction_raster_path, gdal.OF_RASTER)
+    friction_band = friction_raster.GetRasterBand(1)
+    population_raster = gdal.OpenEx(
+        population_raster_path, gdal.OF_RASTER)
+    population_band = population_raster.GetRasterBand(1)
+
     for core_y in range(0, ny, core_size):
         raster_y = core_y - core_size
         raster_y_offset = 0
@@ -228,9 +239,6 @@ def people_access(
                 raster_y, core_y, raster_win_ysize, raster_y_offset,
                 raster_x, core_x, raster_win_xsize, raster_x_offset)
 
-            friction_raster = gdal.OpenEx(
-                friction_raster_path, gdal.OF_RASTER)
-            friction_band = friction_raster.GetRasterBand(1)
             friction_band.ReadAsArray(
                 xoff=raster_x, yoff=raster_y,
                 win_xsize=raster_win_xsize, win_ysize=raster_win_ysize,
@@ -238,9 +246,6 @@ def people_access(
                     raster_y_offset:raster_y_offset+raster_win_ysize,
                     raster_x_offset:raster_x_offset+raster_win_xsize])
             population_array[:] = 0.0
-            population_raster = gdal.OpenEx(
-                population_raster_path, gdal.OF_RASTER)
-            population_band = population_raster.GetRasterBand(1)
             population_band.ReadAsArray(
                 xoff=raster_x, yoff=raster_y,
                 win_xsize=raster_win_xsize, win_ysize=raster_win_ysize,
@@ -251,11 +256,11 @@ def people_access(
             # the nodata value is undefined but will present as 0.
             friction_array[numpy.isclose(friction_array, 0)] = numpy.nan
             # buffer_array[core_y:buffer_ysize, local_x:buffer_xsize]
-            shortest_distances.find_population_reach(
-                friction_array,
-                population_array,
-                cell_length, core_size, core_size, core_size,
-                MAX_TRAVEL_DISTANCE)
+            population_reach = shortest_distances.find_population_reach(
+                friction_array, population_array, cell_length, core_size,
+                core_size, core_size, MAX_TRAVEL_DISTANCE)
+            people_access_band.WriteArray(
+                population_reach, xoff=core_x, yoff=core_y)
 
 
 def find_shortest_distances(

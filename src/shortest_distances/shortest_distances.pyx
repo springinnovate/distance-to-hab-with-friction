@@ -100,8 +100,9 @@ def find_population_reach(
         (core_size, core_size))
     cdef int core_flat_index
     cdef double population_count
+    start_time = time.time()
+    print('calculating population count %d' % core_x)
     for core_x in range(core_size):
-        print('calculating population count %d' % core_x)
         for core_y in range(core_size):
             core_flat_index = (core_y+core_size)*win_xsize+core_size
             population_count = 0
@@ -111,14 +112,6 @@ def find_population_reach(
                     if distances[flat_index, core_flat_index] < max_dist:
                         population_count += population_array[j, i]
             population_reach[core_y, core_x] = population_count
-    """
-
-    dist_matrix = scipy.sparse.csc_matrix(
-        (([1], ([0], [1]))), (array.size, array.size))
-    print('making distances')
-    start_time = time.time()
-    distances = scipy.sparse.csgraph.shortest_path(
-        dist_matrix, method='auto', directed=False)
-    print(distances)
-    print('total time: %s', time.time() - start_time)
-    """
+    print(
+        'total time on determining pop elements %s', time.time() - start_time)
+    return population_reach
