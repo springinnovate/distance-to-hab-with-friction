@@ -97,7 +97,7 @@ def find_population_reach(
     print('total time on %d elements: %s', win_xsize, time.time() - start_time)
     print(travel_time)
 
-    cdef numpy.ndarray[double, ndim=2] population_reach = numpy.empty(
+    cdef numpy.ndarray[double, ndim=2] population_reach = numpy.zeros(
         (core_size, core_size))
     cdef int core_flat_index
     cdef double population_count
@@ -114,11 +114,11 @@ def find_population_reach(
             population_count = 0.0
             for i in range(win_xsize):
                 for j in range(win_ysize):
-                    if i == j:
+                    flat_index = j*win_xsize+i
+                    if flat_index == core_flat_index:
                         population_count += population_array[j, i]
                     else:
-                        flat_index = j*win_xsize+i
-                        if travel_time[flat_index, core_flat_index] < max_time:
+                        if travel_time[core_flat_index, flat_index] < max_time:
                             population_count += population_array[j, i]
             #print('population count ij: %f %d %d' % (population_count, i, j))
             population_reach[core_j, core_i] = population_count
