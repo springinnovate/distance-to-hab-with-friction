@@ -45,6 +45,7 @@ def find_population_reach(
         win_xsize-1, win_xsize, win_xsize+1], dtype=numpy.int)
     cdef int i, j
     cdef double diagonal_cell_length = 2**0.5 * cell_length
+    cdef double working_val
 
     # local cell numbering scheme
     # 0 1 2
@@ -123,7 +124,7 @@ def find_population_reach(
 
     cdef numpy.ndarray[double, ndim=2] population_reach = numpy.zeros(
         (core_size, core_size))
-    cdef int core_flat_index
+    cdef int core_flat_index, core_i, core_j
     cdef double population_count
     start_time = time.time()
     print('calculating population count %d' % core_x)
