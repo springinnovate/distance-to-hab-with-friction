@@ -60,16 +60,40 @@ def find_population_reach(
             if center_val != center_val:  # it's NaN so skip
                 continue
             flat_index = j*win_xsize+i
+            if j > 0 and i > 0:
+                working_val = friction_array[j-1, i-1]
+                if working_val == working_val:
+                    diagonals[0][flat_index-win_xsize-1] = (
+                        diagonal_cell_length / (
+                            working_val + center_val) / 2.0)
+            if j > 0:
+                working_val = friction_array[j-1, i]
+                if working_val == working_val:
+                    diagonals[1][flat_index-win_xsize] = (
+                        diagonal_cell_length / (
+                            working_val + center_val) / 2.0)
             if j > 0 and i < win_xsize - 1:
                 working_val = friction_array[j-1, i+1]
                 if working_val == working_val:
                     diagonals[2][flat_index-win_xsize+1] = (
                         diagonal_cell_length / (
                             working_val + center_val) / 2.0)
+            if i > 0:
+                working_val = friction_array[j, i-1]
+                if working_val == working_val:
+                    diagonals[3][flat_index-1] = (
+                        cell_length / (
+                            working_val + center_val) / 2.0)
             if i < win_xsize - 1:
                 working_val = friction_array[j, i+1]
                 if working_val == working_val:
                     diagonals[4][flat_index+1] = (
+                        cell_length / (
+                            working_val + center_val) / 2.0)
+            if j < win_ysize-1 and i > 0:
+                working_val = friction_array[j+1, i-1]
+                if working_val == working_val:
+                    diagonals[5][flat_index+win_xsize-1] = (
                         cell_length / (
                             working_val + center_val) / 2.0)
             if j < win_ysize-1:
