@@ -235,6 +235,7 @@ def people_access(
                 raster_x = 0
             if raster_x + raster_win_xsize > nx:
                 raster_win_xsize = nx - raster_x
+            core_x_size = core_size
             if core_x + core_x_size > raster_x:
                 core_x_size = raster_x - core_x
             friction_array[:] = numpy.nan
