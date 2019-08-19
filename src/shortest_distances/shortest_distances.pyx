@@ -105,13 +105,20 @@ def find_population_reach(
     for core_x in range(core_size):
         for core_y in range(core_size):
             core_flat_index = (core_y+core_size)*win_xsize+core_size
-            population_count = 0
+            population_count = 0.0
             for i in range(win_xsize):
                 for j in range(win_ysize):
-                    flat_index = j*win_xsize+i
-                    if distances[flat_index, core_flat_index] < max_dist:
-                        population_count += population_array[j, i]
+                    if i == j:
+                        population_count += population_array[
+                            j+core_y, i+core_x]
+                    else:
+                        flat_index = j*win_xsize+i
+                        if distances[flat_index, core_flat_index] < max_dist:
+                            population_count += population_array[
+                                j+core_y, i+core_x]
+            #print('population count ij: %f %d %d' % (population_count, i, j))
             population_reach[core_y, core_x] = population_count
+
     print(
         'total time on determining pop elements %s', time.time() - start_time)
     return population_reach

@@ -30,7 +30,7 @@ TARGET_NODATA = -1
 MAX_TRAVEL_TIME = 4*60  # minutes
 
 # max travel distance to cutoff simulation
-MAX_TRAVEL_DISTANCE = 40000
+MAX_TRAVEL_DISTANCE = 20000
 
 
 logging.basicConfig(
@@ -211,6 +211,7 @@ def people_access(
     population_raster = gdal.OpenEx(
         population_raster_path, gdal.OF_RASTER)
     population_band = population_raster.GetRasterBand(1)
+    population_nodata = population_band.GetNoDataValue()
 
     for core_y in range(0, ny, core_size):
         raster_y = core_y - core_size
@@ -223,8 +224,8 @@ def people_access(
         if raster_y + raster_win_ysize > ny:
             raster_win_ysize = ny - raster_y
         core_y_size = core_size
-        if core_y + core_y_size > raster_y:
-            core_y_size = raster_y - core_y
+        if core_y + core_y_size > ny:
+            core_y_size = ny - core_y
         for core_x in range(0, nx, core_size):
             raster_x = core_x - core_size
             raster_x_offset = 0
@@ -236,8 +237,8 @@ def people_access(
             if raster_x + raster_win_xsize > nx:
                 raster_win_xsize = nx - raster_x
             core_x_size = core_size
-            if core_x + core_x_size > raster_x:
-                core_x_size = raster_x - core_x
+            if core_x + core_x_size > nx:
+                core_x_size = nx - core_x
             friction_array[:] = numpy.nan
             LOGGER.debug(
                 '%d:(%d)%d(%d), %d:(%d)%d(%d)',
@@ -257,6 +258,8 @@ def people_access(
                 buf_obj=population_array[
                     raster_y_offset:raster_y_offset+raster_win_ysize,
                     raster_x_offset:raster_x_offset+raster_win_xsize])
+            population_array[
+                numpy.isclose(population_array, population_nodata)] = 0.0
             LOGGER.debug(friction_array)
             # the nodata value is undefined but will present as 0.
             friction_array[numpy.isclose(friction_array, 0)] = numpy.nan
@@ -265,6 +268,11 @@ def people_access(
                 friction_array, population_array, cell_length, core_size,
                 core_size, core_size, MAX_TRAVEL_DISTANCE)
             LOGGER.debug('population reach size: %s', population_reach.shape)
+            LOGGER.debug(
+                'core_y_size %d, core_x_size %d '
+                'core_x %d, core_y %d', core_y_size, core_x_size, core_x,
+                core_y)
+            LOGGER.debug(population_reach)
             people_access_band.WriteArray(
                 population_reach[0:core_y_size, 0:core_x_size],
                 xoff=core_x, yoff=core_y)
