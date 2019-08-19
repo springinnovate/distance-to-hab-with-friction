@@ -27,7 +27,7 @@ ECOSHARD_DIR = os.path.join(WORKSPACE_DIR, 'ecoshard')
 TARGET_NODATA = -1
 
 # max travel time in minutes, basing off of half of a travel day (roundtrip)
-MAX_TRAVEL_TIME = 4*60  # minutes
+MAX_TRAVEL_TIME = 4^60  # minutes
 
 # max travel distance to cutoff simulation
 MAX_TRAVEL_DISTANCE = 20000
@@ -266,7 +266,7 @@ def people_access(
             # buffer_array[core_y:buffer_ysize, local_x:buffer_xsize]
             population_reach = shortest_distances.find_population_reach(
                 friction_array, population_array, cell_length, core_size,
-                core_size, core_size, MAX_TRAVEL_DISTANCE)
+                core_size, core_size, MAX_TRAVEL_TIME)
             LOGGER.debug('population reach size: %s', population_reach.shape)
             LOGGER.debug(
                 'core_y_size %d, core_x_size %d '
