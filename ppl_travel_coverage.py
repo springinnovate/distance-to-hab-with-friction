@@ -202,8 +202,9 @@ def people_access(
     core_size = int(max_travel_distance_in_pixels*2)
     nx, ny = friction_raster_info['raster_size']
     LOGGER.debug('%d %d', nx, ny)
-    friction_array = numpy.empty((core_size*2, core_size*2))
-    population_array = numpy.empty((core_size*2, core_size*2))
+    window_size = core_size*3
+    friction_array = numpy.empty((window_size, window_size))
+    population_array = numpy.empty((window_size, window_size))
     LOGGER.debug('friction array size: %s', friction_array.shape)
 
     friction_raster = gdal.OpenEx(
@@ -217,7 +218,7 @@ def people_access(
     for core_y in range(0, ny, core_size):
         raster_y = core_y - core_size
         raster_y_offset = 0
-        raster_win_ysize = core_size*2
+        raster_win_ysize = window_size
         if raster_y < 0:
             raster_y_offset = abs(raster_y)
             raster_win_ysize += raster_y
@@ -230,7 +231,7 @@ def people_access(
         for core_x in range(0, nx, core_size):
             raster_x = core_x - core_size
             raster_x_offset = 0
-            raster_win_xsize = core_size*2
+            raster_win_xsize = window_size
             if raster_x < 0:
                 raster_x_offset = abs(raster_x)
                 raster_win_xsize += raster_x
@@ -266,7 +267,7 @@ def people_access(
             # buffer_array[core_y:buffer_ysize, local_x:buffer_xsize]
             population_reach = shortest_distances.find_population_reach(
                 friction_array, population_array, cell_length, core_size,
-                core_size, core_size, MAX_TRAVEL_TIME)
+                core_size, core_size, MAX_TRAVEL_TIME, MAX_TRAVEL_DISTANCE)
             LOGGER.debug('population reach size: %s', population_reach.shape)
             LOGGER.debug(
                 'core_y_size %d, core_x_size %d '
