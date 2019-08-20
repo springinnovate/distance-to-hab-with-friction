@@ -41,10 +41,9 @@ def find_population_reach(
     cdef int n = win_xsize * win_ysize
     cdef int flat_index
     cdef double center_val
-    cdef double[:, :] diagonals = numpy.zeros((8, n))
+    cdef double[:, :] diagonals = numpy.zeros((4, n))
     cdef int[:] diagonal_offsets = numpy.array([
-        -win_xsize-1, -win_xsize, -win_xsize+1, -1, 1,
-        win_xsize-1, win_xsize, win_xsize+1], dtype=numpy.int)
+        -win_xsize, -win_xsize+1, 1, win_xsize+1], dtype=numpy.int)
     cdef int i, j
     cdef double diagonal_cell_length = 2**0.5 * cell_length
     cdef double working_val
@@ -65,60 +64,33 @@ def find_population_reach(
                 continue
             n_elements += 1
             flat_index = j*win_xsize+i
-            if j > 0 and i > 0:
-                working_val = friction_array[j-1, i-1]
-                if working_val == working_val:
-                    diagonals[0][flat_index-win_xsize-1] = (
-                        diagonal_cell_length * (
-                            working_val + center_val) / 2.0)
             if j > 0:
                 working_val = friction_array[j-1, i]
                 if working_val == working_val:
-                    diagonals[1][flat_index-win_xsize] = (
+                    diagonals[0][flat_index-win_xsize] = (
                         diagonal_cell_length * (
                             working_val + center_val) / 2.0)
             if j > 0 and i < win_xsize - 1:
                 working_val = friction_array[j-1, i+1]
                 if working_val == working_val:
-                    diagonals[2][flat_index-win_xsize+1] = (
+                    diagonals[1][flat_index-win_xsize+1] = (
                         diagonal_cell_length * (
-                            working_val + center_val) / 2.0)
-            if i > 0:
-                working_val = friction_array[j, i-1]
-                if working_val == working_val:
-                    diagonals[3][flat_index-1] = (
-                        cell_length * (
                             working_val + center_val) / 2.0)
             if i < win_xsize - 1:
                 working_val = friction_array[j, i+1]
                 if working_val == working_val:
-                    diagonals[4][flat_index+1] = (
-                        cell_length * (
-                            working_val + center_val) / 2.0)
-            if j < win_ysize-1 and i > 0:
-                working_val = friction_array[j+1, i-1]
-                if working_val == working_val:
-                    diagonals[5][flat_index+win_xsize-1] = (
-                        cell_length * (
-                            working_val + center_val) / 2.0)
-            if j < win_ysize-1:
-                working_val = friction_array[j+1, i]
-                if working_val == working_val:
-                    diagonals[6][flat_index+win_xsize] = (
+                    diagonals[2][flat_index+1] = (
                         cell_length * (
                             working_val + center_val) / 2.0)
             if j < win_ysize-1 and i < win_xsize - 1:
                 working_val = friction_array[j+1, i+1]
                 if working_val == working_val:
-                    diagonals[7][flat_index+win_xsize+1] = (
+                    diagonals[3][flat_index+win_xsize+1] = (
                         diagonal_cell_length * (
                             working_val + center_val) / 2.0)
 
     dist_matrix = scipy.sparse.dia_matrix((
         diagonals, diagonal_offsets), shape=(n, n))
-    # numpy.set_printoptions(
-    #     threshold=numpy.inf, linewidth=numpy.inf, precision=3)
-    # print(dist_matrix.toarray())
     print('calculate distances')
     cdef numpy.ndarray[double, ndim=2] travel_time
     cdef numpy.ndarray[int, ndim=2] predecessors
@@ -163,7 +135,6 @@ def find_population_reach(
                                     break
                             if n_steps <= max_travel_steps:
                                 population_count += population_array[j, i]
-            #print('population count ij: %f %d %d' % (population_count, i, j))
             population_reach[core_j, core_i] = population_count
 
     print(
