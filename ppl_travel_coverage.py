@@ -16,6 +16,7 @@ import scipy.sparse.csgraph
 import shortest_distances
 
 RASTER_ECOSHARD_URL_MAP = {
+    # minutes/meter
     'friction_surface': 'https://storage.googleapis.com/ecoshard-root/critical_natural_capital/friction_surface_2015_v1.0-002_md5_166d17746f5dd49cfb2653d721c2267c.tif',
     'population_layer': r'https://storage.googleapis.com/ecoshard-root/lspop2017_md5_86d653478c1d99d4c6e271bad280637d.tif',
     'world_borders': r'https://storage.googleapis.com/ecoshard-root/critical_natural_capital/TM_WORLD_BORDERS-0.3_simplified_md5_47f2059be8d4016072aa6abe77762021.gpkg'
@@ -172,7 +173,7 @@ def people_access(
 
     Parameters:
         friction_raster_path (str): path to a raster whose units are
-            meters/minute required to cross any given pixel. Values of 0 are
+            minutes/meter required to cross any given pixel. Values of 0 are
             treated as impassible.
         population_raster_path (str): path to a per-pixel population count
             raster.
@@ -260,7 +261,6 @@ def people_access(
                     raster_x_offset:raster_x_offset+raster_win_xsize])
             population_array[
                 numpy.isclose(population_array, population_nodata)] = 0.0
-            LOGGER.debug(friction_array)
             # the nodata value is undefined but will present as 0.
             friction_array[numpy.isclose(friction_array, 0)] = numpy.nan
             # buffer_array[core_y:buffer_ysize, local_x:buffer_xsize]
@@ -272,7 +272,6 @@ def people_access(
                 'core_y_size %d, core_x_size %d '
                 'core_x %d, core_y %d', core_y_size, core_x_size, core_x,
                 core_y)
-            LOGGER.debug(population_reach)
             people_access_band.WriteArray(
                 population_reach[0:core_y_size, 0:core_x_size],
                 xoff=core_x, yoff=core_y)

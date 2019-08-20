@@ -18,7 +18,7 @@ def find_population_reach(
 
     Parameters:
         friction_array (numpy.ndarray): array with friction values for
-            determining lcp in units m/meter.
+            determining lcp in units minutes/meter.
         population_array (numpy.ndarray): array with population values per
             pixel.
         cell_length (double): length of cell in meters.
@@ -65,49 +65,49 @@ def find_population_reach(
                 working_val = friction_array[j-1, i-1]
                 if working_val == working_val:
                     diagonals[0][flat_index-win_xsize-1] = (
-                        diagonal_cell_length / (
+                        diagonal_cell_length * (
                             working_val + center_val) / 2.0)
             if j > 0:
                 working_val = friction_array[j-1, i]
                 if working_val == working_val:
                     diagonals[1][flat_index-win_xsize] = (
-                        diagonal_cell_length / (
+                        diagonal_cell_length * (
                             working_val + center_val) / 2.0)
             if j > 0 and i < win_xsize - 1:
                 working_val = friction_array[j-1, i+1]
                 if working_val == working_val:
                     diagonals[2][flat_index-win_xsize+1] = (
-                        diagonal_cell_length / (
+                        diagonal_cell_length * (
                             working_val + center_val) / 2.0)
             if i > 0:
                 working_val = friction_array[j, i-1]
                 if working_val == working_val:
                     diagonals[3][flat_index-1] = (
-                        cell_length / (
+                        cell_length * (
                             working_val + center_val) / 2.0)
             if i < win_xsize - 1:
                 working_val = friction_array[j, i+1]
                 if working_val == working_val:
                     diagonals[4][flat_index+1] = (
-                        cell_length / (
+                        cell_length * (
                             working_val + center_val) / 2.0)
             if j < win_ysize-1 and i > 0:
                 working_val = friction_array[j+1, i-1]
                 if working_val == working_val:
                     diagonals[5][flat_index+win_xsize-1] = (
-                        cell_length / (
+                        cell_length * (
                             working_val + center_val) / 2.0)
             if j < win_ysize-1:
                 working_val = friction_array[j+1, i]
                 if working_val == working_val:
                     diagonals[6][flat_index+win_xsize] = (
-                        cell_length / (
+                        cell_length * (
                             working_val + center_val) / 2.0)
             if j < win_ysize-1 and i < win_xsize - 1:
                 working_val = friction_array[j+1, i+1]
                 if working_val == working_val:
                     diagonals[7][flat_index+win_xsize+1] = (
-                        diagonal_cell_length / (
+                        diagonal_cell_length * (
                             working_val + center_val) / 2.0)
 
     dist_matrix = scipy.sparse.dia_matrix((
@@ -120,16 +120,15 @@ def find_population_reach(
         scipy.sparse.csgraph.shortest_path(
             dist_matrix, method='D', directed=False))
     print('total time on %d elements: %s', win_xsize, time.time() - start_time)
-    print(travel_time)
 
     cdef numpy.ndarray[double, ndim=2] population_reach = numpy.zeros(
         (core_size, core_size))
     cdef int core_flat_index, core_i, core_j
     cdef double population_count
     start_time = time.time()
-    print('calculating population count %d' % core_x)
-    print('unique population array: %s' % numpy.unique(population_array))
-    print('distance min max: %s %s' % (numpy.max(travel_time[travel_time != numpy.inf]), numpy.min(travel_time)))
+    print(
+        'distance percentiles: %s' % numpy.percentile(
+            travel_time[travel_time != numpy.inf], [0, 25, 50, 75, 100]))
     for core_i in range(core_size):
         for core_j in range(core_size):
             # the core x/y starts halfway in on the cor length of the raster
