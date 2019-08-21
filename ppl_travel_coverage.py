@@ -1,4 +1,6 @@
 """Distance to habitat with a friction layer."""
+import datetime
+import multiprocessing
 import time
 import os
 import logging
@@ -23,6 +25,7 @@ RASTER_ECOSHARD_URL_MAP = {
 }
 
 WORKSPACE_DIR = 'workspace_dist_to_hab_with_friction'
+COUNTRY_WORKSPACE_DIR = os.path.join(WORKSPACE_DIR, 'country_workspaces')
 CHURN_DIR = os.path.join(WORKSPACE_DIR, 'churn')
 ECOSHARD_DIR = os.path.join(WORKSPACE_DIR, 'ecoshard')
 TARGET_NODATA = -1
@@ -33,6 +36,7 @@ MAX_TRAVEL_TIME = 1*60  # minutes
 # max travel distance to cutoff simulation
 MAX_TRAVEL_DISTANCE = 20000
 
+TASKGRAPH_WORKERS = multiprocessing.cpu_count()
 
 logging.basicConfig(
     level=logging.DEBUG,
@@ -50,7 +54,7 @@ def main():
             os.makedirs(dir_path)
         except OSError:
             pass
-    task_graph = taskgraph.TaskGraph(CHURN_DIR, -1, 5.0)
+    task_graph = taskgraph.TaskGraph(CHURN_DIR, TASKGRAPH_WORKERS, 5.0)
     ecoshard_path_map = {}
     # download hab mask and ppl fed equivalent raster
     for data_id, data_url in RASTER_ECOSHARD_URL_MAP.items():
@@ -67,12 +71,23 @@ def main():
         ecoshard_path_map['world_borders'], gdal.OF_VECTOR)
     world_borders_layer = world_borders_vector.GetLayer()
 
-    world_borders_layer.SetAttributeFilter("NAME = 'Bhutan'")
+    area_fid_list = []
+    for country_feature in world_borders_layer:
+        country_name = country_feature.GetField('NAME')
+        fid = country_feature.GetFID()
+        country_geom = country_feature.GetGeometryRef()
+        area_fid_list.append((
+            country_geom.GetArea(), country_feature.GetFID()))
+
+    world_borders_layer.ResetReading()
 
     friction_raster_info = pygeoprocessing.get_raster_info(
         ecoshard_path_map['friction_surface'])
-    for country_feature in world_borders_layer:
+    #for country_feature in world_borders_layer:
+    for country_area, country_fid in sorted(area_fid_list):
+        country_feature = world_borders_layer.GetFeature(country_fid)
         country_name = country_feature.GetField('NAME')
+        LOGGER.debug('%s: %f %d', country_name, country_area, country_fid)
         fid = country_feature.GetFID()
         LOGGER.debug(country_name)
         country_geom = country_feature.GetGeometryRef()
@@ -84,22 +99,24 @@ def main():
         LOGGER.debug(epsg_code)
         epsg_srs = osr.SpatialReference()
         epsg_srs.ImportFromEPSG(epsg_code)
-        country_workspace = os.path.join(WORKSPACE_DIR, country_name)
+        country_workspace = os.path.join(COUNTRY_WORKSPACE_DIR, country_name)
         try:
             os.makedirs(country_workspace)
         except OSError:
             pass
         country_vector_path = os.path.join(
             country_workspace, '%s.gpkg' % country_name)
+        country_vector_complete_token_path = (
+            '%s.COMPLETE' % country_vector_path)
         extract_country_task = task_graph.add_task(
             func=extract_and_project_feature,
             args=(
                 ecoshard_path_map['world_borders'], fid, epsg_code,
-                country_vector_path),
-            target_path_list=[country_vector_path],
-            task_name='make local watershed for %s' % country_name)
+                country_vector_path, country_vector_complete_token_path),
+            target_path_list=[country_vector_complete_token_path],
+            task_name='make local country for %s' % country_name)
         extract_country_task.join()
-
+        continue
         base_raster_path_list = [
             ecoshard_path_map['friction_surface'],
             ecoshard_path_map['population_layer'],
@@ -133,7 +150,6 @@ def main():
         target_pixel_size = (
             m_per_deg*friction_raster_info['pixel_size'][0],
             m_per_deg*friction_raster_info['pixel_size'][1])
-        LOGGER.debug(target_pixel_size)
         # this will project values outside to 0 since there's not a nodata
         # value defined
         projection_task = task_graph.add_task(
@@ -155,11 +171,17 @@ def main():
 
         people_access_path = os.path.join(
             country_workspace, 'people_access.tif')
-        people_access(
-            utm_friction_path, utm_population_path, MAX_TRAVEL_TIME,
-            MAX_TRAVEL_DISTANCE, people_access_path)
+        people_access_task = task_graph.add_task(
+            func=people_access,
+            args=(
+                utm_friction_path, utm_population_path, MAX_TRAVEL_TIME,
+                MAX_TRAVEL_DISTANCE, people_access_path),
+            target_path_list=[people_access_path],
+            dependent_task_list=[projection_task],
+            task_name='calculating people access for %s' % country_name)
 
     task_graph.close()
+    task_graph.join()
 
 
 def people_access(
@@ -311,7 +333,8 @@ def find_shortest_distances(
 
 
 def extract_and_project_feature(
-        vector_path, feature_id, epsg_code, target_vector_path):
+        vector_path, feature_id, epsg_code, target_vector_path,
+        target_complete_token_path):
     """Make a local projection of a single feature in a vector.
 
     Parameters:
@@ -320,6 +343,8 @@ def extract_and_project_feature(
         epsg_code (str): EPSG code to project feature to.
         target_gpkg_vector_path (str): path to new GPKG vector that will
             contain only that feature.
+        target_complete_token_path (str): path to a file that is created if
+             the function successfully completes.
 
     Returns:
         None.
@@ -358,6 +383,8 @@ def extract_and_project_feature(
     base_feature = None
     target_layer = None
     target_vector = None
+    with open(target_complete_token_path, 'w') as token_file:
+        token_file.write(str(datetime.datetime.now()))
 
 
 def length_of_degree(lat):
