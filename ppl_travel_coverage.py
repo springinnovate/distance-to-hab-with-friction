@@ -21,7 +21,8 @@ RASTER_ECOSHARD_URL_MAP = {
     # minutes/meter
     'friction_surface': 'https://storage.googleapis.com/ecoshard-root/critical_natural_capital/friction_surface_2015_v1.0-002_md5_166d17746f5dd49cfb2653d721c2267c.tif',
     'population_layer': r'https://storage.googleapis.com/ecoshard-root/lspop2017_md5_86d653478c1d99d4c6e271bad280637d.tif',
-    'world_borders': r'https://storage.googleapis.com/ecoshard-root/critical_natural_capital/TM_WORLD_BORDERS-0.3_simplified_md5_47f2059be8d4016072aa6abe77762021.gpkg'
+    'world_borders': r'https://storage.googleapis.com/ecoshard-root/critical_natural_capital/TM_WORLD_BORDERS-0.3_simplified_md5_47f2059be8d4016072aa6abe77762021.gpkg',
+    'habitat_mask': r'https://storage.googleapis.com/critical-natural-capital-ecoshards/masked_nathab_esa_md5_40577bae3ef60519b1043bb8582a07af.tif'
 }
 
 WORKSPACE_DIR = 'workspace_dist_to_hab_with_friction'
@@ -36,7 +37,7 @@ MAX_TRAVEL_TIME = 1*60  # minutes
 # max travel distance to cutoff simulation
 MAX_TRAVEL_DISTANCE = 20000
 
-TASKGRAPH_WORKERS = multiprocessing.cpu_count()
+TASKGRAPH_WORKERS = 0  # multiprocessing.cpu_count()
 
 logging.basicConfig(
     level=logging.DEBUG,
@@ -76,19 +77,7 @@ def main():
         country_name = country_feature.GetField('NAME')
         fid = country_feature.GetFID()
         country_geom = country_feature.GetGeometryRef()
-        area_fid_list.append((
-            country_geom.GetArea(), country_feature.GetFID()))
 
-    world_borders_layer.ResetReading()
-
-    friction_raster_info = pygeoprocessing.get_raster_info(
-        ecoshard_path_map['friction_surface'])
-    #for country_feature in world_borders_layer:
-    for country_area, country_fid in sorted(area_fid_list):
-        country_feature = world_borders_layer.GetFeature(country_fid)
-        country_name = country_feature.GetField('NAME')
-        LOGGER.debug('%s: %f %d', country_name, country_area, country_fid)
-        fid = country_feature.GetFID()
         LOGGER.debug(country_name)
         country_geom = country_feature.GetGeometryRef()
         # find EPSG code that would be central to the country
@@ -99,6 +88,16 @@ def main():
         LOGGER.debug(epsg_code)
         epsg_srs = osr.SpatialReference()
         epsg_srs.ImportFromEPSG(epsg_code)
+
+        area_fid_list.append((
+            country_geom.GetArea(), epsg_srs.ExportToWkt(), country_name))
+
+    world_borders_layer.ResetReading()
+
+    friction_raster_info = pygeoprocessing.get_raster_info(
+        ecoshard_path_map['friction_surface'])
+    for country_area, epsg_wkt, country_name in sorted(area_fid_list):
+
         country_workspace = os.path.join(COUNTRY_WORKSPACE_DIR, country_name)
         try:
             os.makedirs(country_workspace)
@@ -111,22 +110,23 @@ def main():
         extract_country_task = task_graph.add_task(
             func=extract_and_project_feature,
             args=(
-                ecoshard_path_map['world_borders'], fid, epsg_code,
+                ecoshard_path_map['world_borders'], fid, epsg_wkt,
                 country_vector_path, country_vector_complete_token_path),
             ignore_path_list=[country_vector_path],
             target_path_list=[country_vector_complete_token_path],
             task_name='make local country for %s' % country_name)
-        extract_country_task.join()
-        continue
         base_raster_path_list = [
             ecoshard_path_map['friction_surface'],
             ecoshard_path_map['population_layer'],
+            ecoshard_path_map['habitat_mask'],
         ]
         wgs84_raster_path_list = [
             os.path.join(
                 country_workspace, 'wgs84_%s_friction.tif' % country_name),
             os.path.join(
-                country_workspace, 'wgs84_%s_population.tif' % country_name)
+                country_workspace, 'wgs84_%s_population.tif' % country_name),
+            os.path.join(
+                country_workspace, 'wsg84_%s_hab_mask.tif' % country_name)
         ]
         clip_task = task_graph.add_task(
             func=pygeoprocessing.align_and_resize_raster_stack,
@@ -145,7 +145,10 @@ def main():
             country_workspace, 'utm_%s_friction.tif' % country_name)
         utm_population_path = os.path.join(
             country_workspace, 'utm_%s_population.tif' % country_name)
-        utm_raster_path_list = [utm_friction_path, utm_population_path]
+        utm_hab_path = os.path.join(
+            country_workspace, 'utm_%s_hab.tif' % country_name)
+        utm_raster_path_list = [
+            utm_friction_path, utm_population_path, utm_hab_path]
 
         m_per_deg = length_of_degree(centroid_geom.GetY())
         target_pixel_size = (
@@ -170,6 +173,7 @@ def main():
             target_path_list=utm_raster_path_list,
             task_name='project for %s' % country_name)
 
+        continue
         people_access_path = os.path.join(
             country_workspace, 'people_access.tif')
         people_access_task = task_graph.add_task(
@@ -334,14 +338,14 @@ def find_shortest_distances(
 
 
 def extract_and_project_feature(
-        vector_path, feature_id, epsg_code, target_vector_path,
+        vector_path, feature_id, projection_wkt, target_vector_path,
         target_complete_token_path):
     """Make a local projection of a single feature in a vector.
 
     Parameters:
         vector_path (str): base vector in WGS84 coordinates.
         feature_id (int): FID for the feature to extract.
-        epsg_code (str): EPSG code to project feature to.
+        projection_wkt (str): projection wkt code to project feature to.
         target_gpkg_vector_path (str): path to new GPKG vector that will
             contain only that feature.
         target_complete_token_path (str): path to a file that is created if
@@ -351,15 +355,15 @@ def extract_and_project_feature(
         None.
 
     """
-    vector = gdal.OpenEx(vector_path, gdal.OF_VECTOR)
-    layer = vector.GetLayer()
-    feature = layer.GetFeature(feature_id)
+    base_vector = gdal.OpenEx(vector_path, gdal.OF_VECTOR)
+    base_layer = base_vector.GetLayer()
+    feature = base_layer.GetFeature(feature_id)
     geom = feature.GetGeometryRef()
 
     epsg_srs = osr.SpatialReference()
-    epsg_srs.ImportFromEPSG(epsg_code)
+    epsg_srs.ImportFromWkt(projection_wkt)
 
-    base_srs = layer.GetSpatialRef()
+    base_srs = base_layer.GetSpatialRef()
     base_to_utm = osr.CoordinateTransformation(base_srs, epsg_srs)
 
     # clip out watershed to its own file
@@ -384,6 +388,8 @@ def extract_and_project_feature(
     base_feature = None
     target_layer = None
     target_vector = None
+    base_layer = None
+    base_vector = None
     with open(target_complete_token_path, 'w') as token_file:
         token_file.write(str(datetime.datetime.now()))
 
