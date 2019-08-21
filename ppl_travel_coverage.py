@@ -113,6 +113,7 @@ def main():
             args=(
                 ecoshard_path_map['world_borders'], fid, epsg_code,
                 country_vector_path, country_vector_complete_token_path),
+            ignore_path_list=[country_vector_path],
             target_path_list=[country_vector_complete_token_path],
             task_name='make local country for %s' % country_name)
         extract_country_task.join()
