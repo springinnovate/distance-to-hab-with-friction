@@ -30,12 +30,14 @@ COUNTRY_WORKSPACE_DIR = os.path.join(WORKSPACE_DIR, 'country_workspaces')
 CHURN_DIR = os.path.join(WORKSPACE_DIR, 'churn')
 ECOSHARD_DIR = os.path.join(WORKSPACE_DIR, 'ecoshard')
 TARGET_NODATA = -1
+SKIP_THESE_COUNTRIES = ['United States Minor Outlying Islands']
 
 # max travel time in minutes, basing off of half of a travel day (roundtrip)
 MAX_TRAVEL_TIME = 1*60  # minutes
-
 # max travel distance to cutoff simulation
 MAX_TRAVEL_DISTANCE = 20000
+# used to avoid computing paths where the population is too low
+POPULATION_COUNT_CUTOFF = 100
 
 TASKGRAPH_WORKERS = -1  # multiprocessing.cpu_count()
 
@@ -75,7 +77,8 @@ def main():
     area_fid_list = []
     for country_feature in world_borders_layer:
         country_name = country_feature.GetField('NAME')
-        fid = country_feature.GetFID()
+        if country_name in SKIP_THESE_COUNTRIES:
+            continue
         country_geom = country_feature.GetGeometryRef()
 
         LOGGER.debug(country_name)
@@ -90,15 +93,18 @@ def main():
         epsg_srs.ImportFromEPSG(epsg_code)
 
         area_fid_list.append((
-            country_geom.GetArea(), epsg_srs.ExportToWkt(), country_name))
+            country_geom.GetArea(), epsg_srs.ExportToWkt(), country_name,
+            country_feature.GetFID()))
 
     world_borders_layer.ResetReading()
 
     friction_raster_info = pygeoprocessing.get_raster_info(
         ecoshard_path_map['friction_surface'])
-    for country_index, (country_area, epsg_wkt, country_name) in enumerate(
+    for country_index, (country_area, epsg_wkt, country_name, country_fid) in enumerate(
             sorted(area_fid_list)):
-        country_workspace = os.path.join(COUNTRY_WORKSPACE_DIR, country_name)
+        # put the index on there so we can see which one is done first
+        country_workspace = os.path.join(
+            COUNTRY_WORKSPACE_DIR, '%d_%s' % (country_index, country_name))
         try:
             os.makedirs(country_workspace)
         except OSError:
@@ -111,7 +117,7 @@ def main():
             func=extract_and_project_feature,
             priority=-country_index,
             args=(
-                ecoshard_path_map['world_borders'], fid, epsg_wkt,
+                ecoshard_path_map['world_borders'], country_fid, epsg_wkt,
                 country_vector_path, country_vector_complete_token_path),
             ignore_path_list=[country_vector_path],
             target_path_list=[country_vector_complete_token_path],
@@ -182,8 +188,8 @@ def main():
             func=people_access,
             priority=-country_index,
             args=(
-                utm_friction_path, utm_population_path, MAX_TRAVEL_TIME,
-                MAX_TRAVEL_DISTANCE, people_access_path),
+                utm_friction_path, utm_population_path, utm_hab_path,
+                MAX_TRAVEL_TIME, MAX_TRAVEL_DISTANCE, people_access_path),
             target_path_list=[people_access_path],
             dependent_task_list=[projection_task],
             task_name='calculating people access for %s' % country_name)
@@ -193,7 +199,7 @@ def main():
 
 
 def people_access(
-        friction_raster_path, population_raster_path,
+        friction_raster_path, population_raster_path, habitat_raster_path,
         max_travel_time, max_travel_distance, target_people_access_path):
     """Construct a people access raster showing where people can reach.
 
@@ -235,6 +241,7 @@ def people_access(
     window_size = core_size*3
     friction_array = numpy.empty((window_size, window_size))
     population_array = numpy.empty((window_size, window_size))
+    habitat_array = numpy.empty((window_size, window_size))
     LOGGER.debug('friction array size: %s', friction_array.shape)
 
     friction_raster = gdal.OpenEx(
@@ -290,6 +297,22 @@ def people_access(
                 buf_obj=population_array[
                     raster_y_offset:raster_y_offset+raster_win_ysize,
                     raster_x_offset:raster_x_offset+raster_win_xsize])
+            total_population = numpy.sum(population_array[
+                ~numpy.isclose(population_array, population_nodata)])
+            # don't route population where there isn't any
+            if total_population < POPULATION_COUNT_CUTOFF:
+                continue
+            habitat_array[:] = 0.0
+            population_band.ReadAsArray(
+                xoff=raster_x, yoff=raster_y,
+                win_xsize=raster_win_xsize, win_ysize=raster_win_ysize,
+                buf_obj=habitat_array[
+                    raster_y_offset:raster_y_offset+raster_win_ysize,
+                    raster_x_offset:raster_x_offset+raster_win_xsize])
+            habitat_amount = numpy.count_nonzero(habitat_array == 1.0)
+            if habitat_amount == 0:
+                continue
+
             population_array[
                 numpy.isclose(population_array, population_nodata)] = 0.0
             # the nodata value is undefined but will present as 0.
