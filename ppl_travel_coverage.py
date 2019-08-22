@@ -231,6 +231,7 @@ def people_access(
     people_access_raster = gdal.OpenEx(
         target_people_access_path, gdal.OF_RASTER | gdal.GA_Update)
     people_access_band = people_access_raster.GetRasterBand(1)
+    people_access_nodata = people_access_band.GetNoDataValue()
     friction_raster_info = pygeoprocessing.get_raster_info(
         friction_raster_path)
     cell_length = friction_raster_info['pixel_size'][0]
@@ -326,6 +327,10 @@ def people_access(
                 'core_y_size %d, core_x_size %d '
                 'core_x %d, core_y %d', core_y_size, core_x_size, core_x,
                 core_y)
+            # mask by habitat -- set to nodata where there's no habitat
+            population_reach[habitat_array[
+                core_size:2*core_size, core_size:2*core_size] != 0] = (
+                    people_access_nodata)
             people_access_band.WriteArray(
                 population_reach[0:core_y_size, 0:core_x_size],
                 xoff=core_x, yoff=core_y)
