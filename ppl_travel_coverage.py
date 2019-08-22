@@ -96,8 +96,8 @@ def main():
 
     friction_raster_info = pygeoprocessing.get_raster_info(
         ecoshard_path_map['friction_surface'])
-    for country_area, epsg_wkt, country_name in sorted(area_fid_list):
-
+    for country_index, (country_area, epsg_wkt, country_name) in enumerate(
+            sorted(area_fid_list)):
         country_workspace = os.path.join(COUNTRY_WORKSPACE_DIR, country_name)
         try:
             os.makedirs(country_workspace)
@@ -109,6 +109,7 @@ def main():
             '%s.COMPLETE' % country_vector_path)
         extract_country_task = task_graph.add_task(
             func=extract_and_project_feature,
+            priority=-country_index,
             args=(
                 ecoshard_path_map['world_borders'], fid, epsg_wkt,
                 country_vector_path, country_vector_complete_token_path),
@@ -130,6 +131,7 @@ def main():
         ]
         clip_task = task_graph.add_task(
             func=pygeoprocessing.align_and_resize_raster_stack,
+            priority=-country_index,
             args=(
                 base_raster_path_list, wgs84_raster_path_list,
                 ['near']*len(base_raster_path_list),
@@ -158,6 +160,7 @@ def main():
         # value defined
         projection_task = task_graph.add_task(
             func=pygeoprocessing.align_and_resize_raster_stack,
+            priority=-country_index,
             args=(
                 wgs84_raster_path_list, utm_raster_path_list,
                 ['near']*len(base_raster_path_list),
@@ -173,11 +176,11 @@ def main():
             target_path_list=utm_raster_path_list,
             task_name='project for %s' % country_name)
 
-        continue
         people_access_path = os.path.join(
-            country_workspace, 'people_access.tif')
+            country_workspace, 'people_access_%s.tif' % country_name)
         people_access_task = task_graph.add_task(
             func=people_access,
+            priority=-country_index,
             args=(
                 utm_friction_path, utm_population_path, MAX_TRAVEL_TIME,
                 MAX_TRAVEL_DISTANCE, people_access_path),
