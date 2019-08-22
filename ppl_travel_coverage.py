@@ -37,7 +37,7 @@ MAX_TRAVEL_TIME = 1*60  # minutes
 # max travel distance to cutoff simulation
 MAX_TRAVEL_DISTANCE = 20000
 
-TASKGRAPH_WORKERS = 0  # multiprocessing.cpu_count()
+TASKGRAPH_WORKERS = -1  # multiprocessing.cpu_count()
 
 logging.basicConfig(
     level=logging.DEBUG,
@@ -375,7 +375,7 @@ def extract_and_project_feature(
         target_vector_path)
     target_layer = target_vector.CreateLayer(
         os.path.splitext(os.path.basename(target_vector_path))[0],
-        epsg_srs, ogr.wkbPolygon)
+        epsg_srs, ogr.wkbMultiPolygon)
     layer_defn = target_layer.GetLayerDefn()
     feature_geometry = geom.Clone()
     base_feature = ogr.Feature(layer_defn)
