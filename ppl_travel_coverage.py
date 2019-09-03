@@ -49,7 +49,7 @@ MAX_TRAVEL_DISTANCE = 20000
 # used to avoid computing paths where the population is too low
 POPULATION_COUNT_CUTOFF = 100
 
-TASKGRAPH_WORKERS = multiprocessing.cpu_count()
+TASKGRAPH_WORKERS = 0 # multiprocessing.cpu_count()
 
 logging.basicConfig(
     level=logging.DEBUG,
