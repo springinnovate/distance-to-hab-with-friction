@@ -35,6 +35,7 @@ SKIP_THESE_COUNTRIES = [
     'Gibraltar',
     'Pitcairn Islands',
     'Saint Barthelemy',
+    'Saint Martin',
     'United States Minor Outlying Islands',
     ]
 
