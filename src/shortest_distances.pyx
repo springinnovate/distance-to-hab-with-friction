@@ -43,7 +43,7 @@ def find_population_reach(
     cdef double center_val
     cdef double[:, :] diagonals = numpy.zeros((4, n))
     cdef int[:] diagonal_offsets = numpy.array([
-        -win_xsize, -win_xsize+1, 1, win_xsize+1], dtype=numpy.int)
+        -win_xsize, -win_xsize+1, 1, win_xsize+1], dtype=numpy.int32)
     cdef int i, j
     cdef double diagonal_cell_length = 2**0.5 * cell_length
     cdef double working_val
