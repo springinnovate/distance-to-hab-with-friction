@@ -35,6 +35,7 @@ SKIP_THESE_COUNTRIES = [
     'Bermuda',
     'Gibraltar',
     'Guernsey',
+    'Montserrat',
     'Pitcairn Islands',
     'Saint Barthelemy',
     'Saint Martin',
