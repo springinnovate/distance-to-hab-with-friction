@@ -330,14 +330,14 @@ def people_access(
             # the nodata value is undefined but will present as 0.
             friction_array[numpy.isclose(friction_array, 0)] = numpy.nan
             # buffer_array[core_y:buffer_ysize, local_x:buffer_xsize]
+            LOGGER.debug(
+                'calculating population reach: core_y_size %d, '
+                'core_x_size %d core_x %d, core_y %d',
+                core_y_size, core_x_size, core_x, core_y)
             population_reach = shortest_distances.find_population_reach(
                 friction_array, population_array, cell_length, core_size,
                 core_size, core_size, MAX_TRAVEL_TIME, MAX_TRAVEL_DISTANCE)
             LOGGER.debug('population reach size: %s', population_reach.shape)
-            LOGGER.debug(
-                'core_y_size %d, core_x_size %d '
-                'core_x %d, core_y %d', core_y_size, core_x_size, core_x,
-                core_y)
             # mask by habitat -- set to nodata where there's no habitat
             population_reach[habitat_array[
                 core_size:2*core_size, core_size:2*core_size] != 0] = (

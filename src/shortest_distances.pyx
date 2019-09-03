@@ -8,6 +8,14 @@ import numpy
 
 cimport numpy
 
+logging.basicConfig(
+    level=logging.DEBUG,
+    format=(
+        '%(asctime)s (%(relativeCreated)d) %(levelname)s %(name)s'
+        ' [%(funcName)s:%(lineno)d] %(message)s'),
+    stream=sys.stdout)
+LOGGER = logging.getLogger(__name__)
+
 
 def find_population_reach(
         numpy.ndarray[double, ndim=2] friction_array,
@@ -54,6 +62,7 @@ def find_population_reach(
     # 5 6 7
     # there's symmetry in this structure since it's fully connected so
     # on each element we connect to elements 2, 4, 6, and 7 only
+    LOGGER.debug('build distance array')
     cdef int n_elements = 0
     for i in range(win_xsize):
         for j in range(win_ysize):
@@ -91,14 +100,14 @@ def find_population_reach(
 
     dist_matrix = scipy.sparse.dia_matrix((
         diagonals, diagonal_offsets), shape=(n, n))
-    print('calculate distances')
+    LOGGER.debug('calculate distances')
     cdef numpy.ndarray[double, ndim=2] travel_time
     cdef numpy.ndarray[int, ndim=2] predecessors
     travel_time, predecessors = (
         scipy.sparse.csgraph.shortest_path(
             dist_matrix, method='auto', directed=False,
             return_predecessors=True))
-    print('total time on %d elements: %s' % (
+    LOGGER.debug('total time on %d elements: %s' % (
         n_elements, time.time() - start_time))
 
     cdef numpy.ndarray[double, ndim=2] population_reach = numpy.zeros(
@@ -106,7 +115,7 @@ def find_population_reach(
     cdef int core_flat_index, core_i, core_j, n_steps, current_node
     cdef double population_count
     start_time = time.time()
-    print(
+    LOGGER.debug(
         'distance percentiles: %s' % numpy.percentile(
             travel_time[travel_time != numpy.inf], [0, 25, 50, 75, 100]))
     cdef int max_travel_steps = int(max_travel_distance / cell_length)
@@ -137,7 +146,7 @@ def find_population_reach(
                                 population_count += population_array[j, i]
             population_reach[core_j, core_i] = population_count
 
-    print(
+    LOGGER.debug(
         'total time on determining pop elements %.2fs' % (
             time.time() - start_time))
     return population_reach
