@@ -33,6 +33,7 @@ TARGET_NODATA = -1
 SKIP_THESE_COUNTRIES = [
     'Bermuda',
     'Gibraltar',
+    'Pitcairn Islands',
     'Saint Barthelemy',
     'United States Minor Outlying Islands',
     ]
