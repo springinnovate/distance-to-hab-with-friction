@@ -1,6 +1,7 @@
 # cython: language_level=3
 import time
 import logging
+import sys
 
 import pygeoprocessing
 from osgeo import gdal
