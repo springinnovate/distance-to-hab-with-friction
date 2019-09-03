@@ -32,6 +32,7 @@ ECOSHARD_DIR = os.path.join(WORKSPACE_DIR, 'ecoshard')
 TARGET_NODATA = -1
 SKIP_THESE_COUNTRIES = [
     'Anguilla',
+    'Antarctica',
     'Bermuda',
     'Gibraltar',
     'Guernsey',
