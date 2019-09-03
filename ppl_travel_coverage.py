@@ -59,6 +59,7 @@ logging.basicConfig(
         ' [%(funcName)s:%(lineno)d] %(message)s'),
     stream=sys.stdout)
 LOGGER = logging.getLogger(__name__)
+logging.getLogger().addHandler(logging.FileHandler('log.txt'))
 
 
 def main():
