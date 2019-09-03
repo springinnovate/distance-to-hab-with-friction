@@ -7,12 +7,6 @@ setup(
     name='shortest_distances',
     maintainer='Rich Sharp',
     maintainer_email='richpsharp@gmail.com',
-    packages=[
-        'shortest_distances',
-    ],
-    package_dir={
-        'shortest_distances': 'src/shortest_distances'
-    },
     use_scm_version={
         'version_scheme': 'post-release',
         'local_scheme': 'node-and-date'},
@@ -22,7 +16,7 @@ setup(
     ext_modules=[
         Extension(
             name="shortest_distances",
-            sources=["src/shortest_distances/shortest_distances.pyx"],
+            sources=["src/shortest_distances.pyx"],
             include_dirs=[
                 numpy.get_include(),
                 ],
