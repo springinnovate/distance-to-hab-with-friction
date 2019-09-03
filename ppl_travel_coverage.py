@@ -31,6 +31,7 @@ CHURN_DIR = os.path.join(WORKSPACE_DIR, 'churn')
 ECOSHARD_DIR = os.path.join(WORKSPACE_DIR, 'ecoshard')
 TARGET_NODATA = -1
 SKIP_THESE_COUNTRIES = [
+    'Bermuda',
     'Gibraltar',
     'United States Minor Outlying Islands',
     ]
