@@ -40,6 +40,7 @@ SKIP_THESE_COUNTRIES = [
     'Montserrat',
     'Pitcairn Islands',
     'Rwanda',
+    'Senegal',
     'Saint Barthelemy',
     'Saint Martin',
     'United States Minor Outlying Islands',
