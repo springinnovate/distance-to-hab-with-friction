@@ -188,7 +188,7 @@ def main():
                 target_pixel_size, 'intersection'),
             kwargs={
                 'base_vector_path_list': [country_vector_path],
-                'target_sr_wkt': epsg_srs.ExportToWkt(),
+                'target_sr_wkt': epsg_wkt,
                 'vector_mask_options': {
                     'mask_vector_path': country_vector_path,
                 },
