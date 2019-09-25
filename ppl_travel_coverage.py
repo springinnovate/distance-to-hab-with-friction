@@ -55,6 +55,7 @@ SKIP_THESE_COUNTRIES = [
     'French Southern and Antarctic Lands'
     'Solomon Islands']
 
+
 def main():
     """Entry point."""
     for dir_path in [WORKSPACE_DIR, CHURN_DIR, ECOSHARD_DIR]:
@@ -82,6 +83,9 @@ def main():
     area_fid_list = []
     for country_feature in world_borders_layer:
         country_name = country_feature.GetField('NAME')
+        if country_name in SKIP_THESE_COUNTRIES:
+            LOGGER.debug('skipping %s', country_name)
+            continue
         country_geom = country_feature.GetGeometryRef()
 
         LOGGER.debug(country_name)
