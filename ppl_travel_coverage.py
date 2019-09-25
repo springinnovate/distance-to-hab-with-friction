@@ -30,21 +30,6 @@ COUNTRY_WORKSPACE_DIR = os.path.join(WORKSPACE_DIR, 'country_workspaces')
 CHURN_DIR = os.path.join(WORKSPACE_DIR, 'churn')
 ECOSHARD_DIR = os.path.join(WORKSPACE_DIR, 'ecoshard')
 TARGET_NODATA = -1
-SKIP_THESE_COUNTRIES = [
-    'Anguilla',
-    'Antarctica',
-    'Bermuda',
-    'Gibraltar',
-    'Guernsey',
-    'Kiribati',
-    'Montserrat',
-    'Pitcairn Islands',
-    'Rwanda',
-    'Senegal',
-    'Saint Barthelemy',
-    'Saint Martin',
-    'United States Minor Outlying Islands',
-    ]
 
 # max travel time in minutes, basing off of half of a travel day (roundtrip)
 MAX_TRAVEL_TIME = 1*60  # minutes
