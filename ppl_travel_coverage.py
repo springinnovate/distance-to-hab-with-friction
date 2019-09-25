@@ -51,7 +51,7 @@ MAX_TRAVEL_TIME = 1*60  # minutes
 # max travel distance to cutoff simulation
 MAX_TRAVEL_DISTANCE = 20000
 # used to avoid computing paths where the population is too low
-POPULATION_COUNT_CUTOFF = 100
+POPULATION_COUNT_CUTOFF = 0
 
 TASKGRAPH_WORKERS = int(sys.argv[1])  # multiprocessing.cpu_count()
 
@@ -318,16 +318,6 @@ def people_access(
             # don't route population where there isn't any
             if total_population < POPULATION_COUNT_CUTOFF:
                 continue
-            habitat_array[:] = 0.0
-            population_band.ReadAsArray(
-                xoff=raster_x, yoff=raster_y,
-                win_xsize=raster_win_xsize, win_ysize=raster_win_ysize,
-                buf_obj=habitat_array[
-                    raster_y_offset:raster_y_offset+raster_win_ysize,
-                    raster_x_offset:raster_x_offset+raster_win_xsize])
-            habitat_amount = numpy.count_nonzero(habitat_array == 1.0)
-            if habitat_amount == 0:
-                continue
 
             population_array[
                 numpy.isclose(population_array, population_nodata)] = 0.0
@@ -342,10 +332,6 @@ def people_access(
                 friction_array, population_array, cell_length, core_size,
                 core_size, core_size, MAX_TRAVEL_TIME, MAX_TRAVEL_DISTANCE)
             LOGGER.debug('population reach size: %s', population_reach.shape)
-            # mask by habitat -- set to nodata where there's no habitat
-            population_reach[habitat_array[
-                core_size:2*core_size, core_size:2*core_size] != 0] = (
-                    people_access_nodata)
             people_access_band.WriteArray(
                 population_reach[0:core_y_size, 0:core_x_size],
                 xoff=core_x, yoff=core_y)
