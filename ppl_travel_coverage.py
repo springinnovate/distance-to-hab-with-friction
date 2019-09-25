@@ -50,10 +50,22 @@ LOGGER = logging.getLogger(__name__)
 logging.getLogger().addHandler(logging.FileHandler('log.txt'))
 
 SKIP_THESE_COUNTRIES = [
-    'United States Minor Outlying Islands',
+    'Anguilla',
+    'Antarctica',
+    'Bermuda',
+    'French Southern and Antarctic Lands',
+    'Gibraltar',
+    'Guernsey',
     'Kiribati',
-    'French Southern and Antarctic Lands'
-    'Solomon Islands']
+    'Montserrat',
+    'Pitcairn Islands',
+    'Rwanda',
+    'Senegal',
+    'Saint Barthelemy',
+    'Saint Martin',
+    'Solomon Islands',
+    'United States Minor Outlying Islands',
+    ]
 
 
 def main():
