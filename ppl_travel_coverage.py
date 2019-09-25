@@ -49,6 +49,11 @@ logging.basicConfig(
 LOGGER = logging.getLogger(__name__)
 logging.getLogger().addHandler(logging.FileHandler('log.txt'))
 
+SKIP_THESE_COUNTRIES = [
+    'United States Minor Outlying Islands',
+    'Kiribati',
+    'French Southern and Antarctic Lands'
+    'Solomon Islands']
 
 def main():
     """Entry point."""
