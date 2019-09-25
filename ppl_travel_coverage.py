@@ -77,8 +77,6 @@ def main():
     area_fid_list = []
     for country_feature in world_borders_layer:
         country_name = country_feature.GetField('NAME')
-        if country_name in SKIP_THESE_COUNTRIES:
-            continue
         country_geom = country_feature.GetGeometryRef()
 
         LOGGER.debug(country_name)
