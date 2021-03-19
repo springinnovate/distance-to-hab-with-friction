@@ -156,11 +156,11 @@ def main():
                 utm_wkt)]
 
         # make sure the bounding coordinates snap to pixel grid
-        LOGGER.debug(f'projected country_bb: {target_bounding_box}')
         target_bounding_box[0] -= target_bounding_box[0] % TARGET_CELL_LENGTH_M
         target_bounding_box[1] -= target_bounding_box[1] % TARGET_CELL_LENGTH_M
         target_bounding_box[2] += target_bounding_box[2] % TARGET_CELL_LENGTH_M
         target_bounding_box[3] += target_bounding_box[3] % TARGET_CELL_LENGTH_M
+        LOGGER.debug(f'projected country_bb: {target_bounding_box}')
 
         utm_friction_path = os.path.join(
             country_workspace, 'utm_%s_friction.tif' % country_name)
