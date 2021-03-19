@@ -137,13 +137,14 @@ def main():
 
         # swizzle so it's xmin, ymin, xmax, ymax
         country_feature = world_borders_layer.GetFeature(country_fid)
+        LOGGER.debug(f'country name: {country_feature.GetField("NAME")}')
         country_geometry = country_feature.GetGeometryRef()
         country_bb = [
             country_geometry.GetEnvelope()[i] for i in [0, 2, 1, 3]]
 
         # make sure the bounding coordinates snap to pixel grid in global coords
         base_cell_length_deg = population_raster_info['pixel_size'][0]
-        LOGGER.debug(f'base country_bb: {country_bb}')
+        LOGGER.debug(f'lat/lng country_bb: {country_bb}')
         country_bb[0] -= country_bb[0] % base_cell_length_deg
         country_bb[1] -= country_bb[1] % base_cell_length_deg
         country_bb[2] += country_bb[2] % base_cell_length_deg
@@ -155,7 +156,7 @@ def main():
                 utm_wkt)]
 
         # make sure the bounding coordinates snap to pixel grid
-        LOGGER.debug(f'base watershed_bb: {target_bounding_box}')
+        LOGGER.debug(f'projected country_bb: {target_bounding_box}')
         target_bounding_box[0] -= target_bounding_box[0] % TARGET_CELL_LENGTH_M
         target_bounding_box[1] -= target_bounding_box[1] % TARGET_CELL_LENGTH_M
         target_bounding_box[2] += target_bounding_box[2] % TARGET_CELL_LENGTH_M
