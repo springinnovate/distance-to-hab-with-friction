@@ -15,7 +15,11 @@ import ecoshard
 import taskgraph
 import scipy.sparse.csgraph
 
+import pyximport; pyximport.install()
+
 import shortest_distances
+
+gdal.SetCacheMax(2**27)
 
 RASTER_ECOSHARD_URL_MAP = {
     # minutes/meter
@@ -34,9 +38,11 @@ TARGET_NODATA = -1
 # max travel time in minutes, basing off of half of a travel day (roundtrip)
 MAX_TRAVEL_TIME = 1*60  # minutes
 # max travel distance to cutoff simulation
-MAX_TRAVEL_DISTANCE = 20000
+MAX_TRAVEL_DISTANCE = 9999999
 # used to avoid computing paths where the population is too low
 POPULATION_COUNT_CUTOFF = 0
+# local distance pixel size
+TARGET_CELL_LENGTH_M = 1000
 
 TASKGRAPH_WORKERS = int(sys.argv[1])  # multiprocessing.cpu_count()
 
@@ -71,21 +77,19 @@ SKIP_THESE_COUNTRIES = [
 def main():
     """Entry point."""
     for dir_path in [WORKSPACE_DIR, CHURN_DIR, ECOSHARD_DIR]:
-        try:
-            os.makedirs(dir_path)
-        except OSError:
-            pass
+        os.makedirs(dir_path, exist_ok=True)
     task_graph = taskgraph.TaskGraph(CHURN_DIR, TASKGRAPH_WORKERS, 5.0)
     ecoshard_path_map = {}
-    # download hab mask and ppl fed equivalent raster
-    for data_id, data_url in RASTER_ECOSHARD_URL_MAP.items():
-        raster_path = os.path.join(ECOSHARD_DIR, os.path.basename(data_url))
+
+    for ecoshard_id, ecoshard_url in RASTER_ECOSHARD_URL_MAP.items():
+        ecoshard_path = os.path.join(
+            ECOSHARD_DIR, os.path.basename(ecoshard_url))
         _ = task_graph.add_task(
             func=ecoshard.download_url,
-            args=(data_url, raster_path),
-            target_path_list=[raster_path],
-            task_name='fetch %s' % data_url)
-        ecoshard_path_map[data_id] = raster_path
+            args=(ecoshard_url, ecoshard_path),
+            target_path_list=[ecoshard_path],
+            task_name=f'fetch {ecoshard_url}')
+        ecoshard_path_map[ecoshard_id] = ecoshard_path
     task_graph.join()
 
     world_borders_vector = gdal.OpenEx(
@@ -107,67 +111,56 @@ def main():
         utm_code = (numpy.floor((centroid_geom.GetX()+180)/6) % 60)+1
         lat_code = 6 if centroid_geom.GetY() > 0 else 7
         epsg_code = int('32%d%02d' % (lat_code, utm_code))
-        LOGGER.debug(epsg_code)
-        epsg_srs = osr.SpatialReference()
-        epsg_srs.ImportFromEPSG(epsg_code)
+        utm_srs = osr.SpatialReference()
+        utm_srs.ImportFromEPSG(epsg_code)
 
         area_fid_list.append((
-            country_geom.GetArea(), epsg_srs.ExportToWkt(), country_name,
+            country_geom.GetArea(), utm_srs.ExportToWkt(), country_name,
             country_feature.GetFID()))
 
     world_borders_layer.ResetReading()
 
-    friction_raster_info = pygeoprocessing.get_raster_info(
-        ecoshard_path_map['friction_surface'])
-    for country_index, (country_area, epsg_wkt, country_name, country_fid) in enumerate(
-            sorted(area_fid_list)):
+    population_raster_info = pygeoprocessing.get_raster_info(
+        ecoshard_path_map['population_layer'])
+    for country_index, (
+            country_area, utm_wkt, country_name, country_fid) in enumerate(
+                sorted(area_fid_list)):
         # put the index on there so we can see which one is done first
         country_workspace = os.path.join(
-            COUNTRY_WORKSPACE_DIR, '%d_%s' % (country_index, country_name))
-        try:
-            os.makedirs(country_workspace)
-        except OSError:
-            pass
-        country_vector_path = os.path.join(
-            country_workspace, '%s.gpkg' % country_name)
-        country_vector_complete_token_path = (
-            '%s.COMPLETE' % country_vector_path)
-        extract_country_task = task_graph.add_task(
-            func=extract_and_project_feature,
-            priority=-country_index,
-            args=(
-                ecoshard_path_map['world_borders'], country_fid, epsg_wkt,
-                country_vector_path, country_vector_complete_token_path),
-            ignore_path_list=[country_vector_path],
-            target_path_list=[country_vector_complete_token_path],
-            task_name='make local country for %s' % country_name)
+            COUNTRY_WORKSPACE_DIR, f'{country_index}_{country_name}')
+        os.makedirs(country_workspace, exist_ok=True)
         base_raster_path_list = [
             ecoshard_path_map['friction_surface'],
             ecoshard_path_map['population_layer'],
             ecoshard_path_map['habitat_mask'],
         ]
-        wgs84_raster_path_list = [
-            os.path.join(
-                country_workspace, 'wgs84_%s_friction.tif' % country_name),
-            os.path.join(
-                country_workspace, 'wgs84_%s_population.tif' % country_name),
-            os.path.join(
-                country_workspace, 'wsg84_%s_hab_mask.tif' % country_name)
-        ]
-        clip_task = task_graph.add_task(
-            func=pygeoprocessing.align_and_resize_raster_stack,
-            priority=-country_index,
-            args=(
-                base_raster_path_list, wgs84_raster_path_list,
-                ['near']*len(base_raster_path_list),
-                friction_raster_info['pixel_size'], 'intersection'),
-            kwargs={
-                'base_vector_path_list': [country_vector_path],
-                'target_sr_wkt': friction_raster_info['projection']
-                },
-            dependent_task_list=[extract_country_task],
-            target_path_list=wgs84_raster_path_list,
-            task_name='project for %s' % country_name)
+
+        # swizzle so it's xmin, ymin, xmax, ymax
+        country_feature = world_borders_layer.GetFeature(country_fid)
+        country_geometry = country_feature.GetGeometryRef()
+        country_bb = [
+            country_geometry.GetEnvelope()[i] for i in [0, 2, 1, 3]]
+
+        # make sure the bounding coordinates snap to pixel grid in global coords
+        base_cell_length_deg = population_raster_info['pixel_size'][0]
+        LOGGER.debug(f'base country_bb: {country_bb}')
+        country_bb[0] -= country_bb[0] % base_cell_length_deg
+        country_bb[1] -= country_bb[1] % base_cell_length_deg
+        country_bb[2] += country_bb[2] % base_cell_length_deg
+        country_bb[3] += country_bb[3] % base_cell_length_deg
+
+        target_bounding_box = [
+            round(v) for v in pygeoprocessing.transform_bounding_box(
+                country_bb, world_borders_layer.GetSpatialRef().ExportToWkt(),
+                utm_wkt)]
+
+        # make sure the bounding coordinates snap to pixel grid
+        LOGGER.debug(f'base watershed_bb: {target_bounding_box}')
+        target_bounding_box[0] -= target_bounding_box[0] % TARGET_CELL_LENGTH_M
+        target_bounding_box[1] -= target_bounding_box[1] % TARGET_CELL_LENGTH_M
+        target_bounding_box[2] += target_bounding_box[2] % TARGET_CELL_LENGTH_M
+        target_bounding_box[3] += target_bounding_box[3] % TARGET_CELL_LENGTH_M
+
         utm_friction_path = os.path.join(
             country_workspace, 'utm_%s_friction.tif' % country_name)
         utm_population_path = os.path.join(
@@ -177,35 +170,27 @@ def main():
         utm_raster_path_list = [
             utm_friction_path, utm_population_path, utm_hab_path]
 
-        m_per_deg = length_of_degree(centroid_geom.GetY())
-        target_pixel_size = (
-            m_per_deg*friction_raster_info['pixel_size'][0],
-            m_per_deg*friction_raster_info['pixel_size'][1])
-        # this will project values outside to 0 since there's not a nodata
-        # value defined
         projection_task = task_graph.add_task(
             func=pygeoprocessing.align_and_resize_raster_stack,
-            priority=-country_index,
             args=(
-                wgs84_raster_path_list, utm_raster_path_list,
+                base_raster_path_list, utm_raster_path_list,
                 ['near']*len(base_raster_path_list),
-                target_pixel_size, 'intersection'),
+                (TARGET_CELL_LENGTH_M, -TARGET_CELL_LENGTH_M),
+                target_bounding_box),
             kwargs={
-                'base_vector_path_list': [country_vector_path],
-                'target_sr_wkt': epsg_wkt,
+                'target_projection_wkt': utm_wkt,
                 'vector_mask_options': {
-                    'mask_vector_path': country_vector_path,
-                },
+                    'mask_vector_path': world_borders_vector,
+                    'mask_vector_where_filter': f'"fid"={country_fid}'
+                }
             },
-            dependent_task_list=[clip_task],
             target_path_list=utm_raster_path_list,
-            task_name='project for %s' % country_name)
+            task_name=f'project and clip rasters for {country_name}')
 
         people_access_path = os.path.join(
             country_workspace, 'people_access_%s.tif' % country_name)
         people_access_task = task_graph.add_task(
             func=people_access,
-            priority=-country_index,
             args=(
                 utm_friction_path, utm_population_path, utm_hab_path,
                 MAX_TRAVEL_TIME, MAX_TRAVEL_DISTANCE, people_access_path),
