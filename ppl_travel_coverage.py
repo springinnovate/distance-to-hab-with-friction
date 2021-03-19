@@ -151,7 +151,7 @@ def main():
         country_bb[3] += country_bb[3] % base_cell_length_deg
 
         target_bounding_box = [
-            round(v) for v in pygeoprocessing.transform_bounding_box(
+            v for v in pygeoprocessing.transform_bounding_box(
                 country_bb, world_borders_layer.GetSpatialRef().ExportToWkt(),
                 utm_wkt)]
 
