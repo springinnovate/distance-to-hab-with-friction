@@ -24,9 +24,9 @@ gdal.SetCacheMax(2**27)
 RASTER_ECOSHARD_URL_MAP = {
     # minutes/meter
     'friction_surface': 'https://storage.googleapis.com/ecoshard-root/critical_natural_capital/friction_surface_2015_v1.0-002_md5_166d17746f5dd49cfb2653d721c2267c.tif',
-    'population_layer': r'https://storage.googleapis.com/ecoshard-root/lspop2017_md5_86d653478c1d99d4c6e271bad280637d.tif',
-    'world_borders': r'https://storage.googleapis.com/ecoshard-root/critical_natural_capital/TM_WORLD_BORDERS-0.3_simplified_md5_47f2059be8d4016072aa6abe77762021.gpkg',
-    'habitat_mask': r'https://storage.googleapis.com/critical-natural-capital-ecoshards/masked_nathab_esa_md5_40577bae3ef60519b1043bb8582a07af.tif'
+    'population_2017': 'https://storage.googleapis.com/ecoshard-root/population/lspop2017_md5_2e8da6824e4d67f8ea321ba4b585a3a5.tif',
+    'habitat_mask': 'https://storage.googleapis.com/critical-natural-capital-ecoshards/habmasks/masked_all_nathab_wstreams_esa2015_md5_c291ff6ef7db1d5ff4d95a82e0f035de.tif'
+    'world_borders': 'https://storage.googleapis.com/ecoshard-root/critical_natural_capital/TM_WORLD_BORDERS-0.3_simplified_md5_47f2059be8d4016072aa6abe77762021.gpkg',
 }
 
 WORKSPACE_DIR = 'workspace_dist_to_hab_with_friction'
@@ -121,7 +121,7 @@ def main():
     world_borders_layer.ResetReading()
 
     population_raster_info = pygeoprocessing.get_raster_info(
-        ecoshard_path_map['population_layer'])
+        ecoshard_path_map['population_2017'])
     for country_index, (
             country_area, utm_wkt, country_name, country_fid) in enumerate(
                 sorted(area_fid_list)):
@@ -131,7 +131,7 @@ def main():
         os.makedirs(country_workspace, exist_ok=True)
         base_raster_path_list = [
             ecoshard_path_map['friction_surface'],
-            ecoshard_path_map['population_layer'],
+            ecoshard_path_map['population_2017'],
             ecoshard_path_map['habitat_mask'],
         ]
 
