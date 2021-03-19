@@ -180,7 +180,7 @@ def main():
             kwargs={
                 'target_projection_wkt': utm_wkt,
                 'vector_mask_options': {
-                    'mask_vector_path': world_borders_vector,
+                    'mask_vector_path': ecoshard_path_map['world_borders'],
                     'mask_vector_where_filter': f'"fid"={country_fid}'
                 }
             },
@@ -189,14 +189,14 @@ def main():
 
         people_access_path = os.path.join(
             country_workspace, 'people_access_%s.tif' % country_name)
-        people_access_task = task_graph.add_task(
-            func=people_access,
-            args=(
-                utm_friction_path, utm_population_path, utm_hab_path,
-                MAX_TRAVEL_TIME, MAX_TRAVEL_DISTANCE, people_access_path),
-            target_path_list=[people_access_path],
-            dependent_task_list=[projection_task],
-            task_name='calculating people access for %s' % country_name)
+        # people_access_task = task_graph.add_task(
+        #     func=people_access,
+        #     args=(
+        #         utm_friction_path, utm_population_path, utm_hab_path,
+        #         MAX_TRAVEL_TIME, MAX_TRAVEL_DISTANCE, people_access_path),
+        #     target_path_list=[people_access_path],
+        #     dependent_task_list=[projection_task],
+        #     task_name='calculating people access for %s' % country_name)
 
     task_graph.close()
     task_graph.join()
