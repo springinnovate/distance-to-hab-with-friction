@@ -43,6 +43,8 @@ MAX_TRAVEL_DISTANCE = 9999999
 POPULATION_COUNT_CUTOFF = 0
 # local distance pixel size
 TARGET_CELL_LENGTH_M = 1000
+# maximum window size to process one set of travel times over
+MAX_WINDOW_SIZE = 100
 
 TASKGRAPH_WORKERS = int(sys.argv[1])  # multiprocessing.cpu_count()
 
@@ -72,6 +74,19 @@ SKIP_THESE_COUNTRIES = [
     'Solomon Islands',
     'United States Minor Outlying Islands',
     ]
+
+
+def get_min_raster_value(raster_path):
+    """Return minimum non-nodata value in raster."""
+    raster = gdal.OpenEx(raster_path, gdal.OF_RASTER)
+    band = raster.GetRasterBand(1)
+    nodata = band.GetNoDataValue()
+    array = band.ReadAsArray()
+    min_value = numpy.min(
+        array[~numpy.isclose(array, nodata) & numpy.isfinite(array)])
+    band = None
+    raster = None
+    return min_value
 
 
 def main():
@@ -190,11 +205,13 @@ def main():
 
         people_access_path = os.path.join(
             country_workspace, 'people_access_%s.tif' % country_name)
+        min_friction = get_min_raster_value(utm_friction_path)
+        max_travel_distance_in_pixels = 1/min_friction*MAX_TRAVEL_TIME/TARGET_CELL_LENGTH_M
         # people_access_task = task_graph.add_task(
         #     func=people_access,
         #     args=(
         #         utm_friction_path, utm_population_path, utm_hab_path,
-        #         MAX_TRAVEL_TIME, MAX_TRAVEL_DISTANCE, people_access_path),
+        #         MAX_TRAVEL_TIME, max_travel_distance_in_pixels, people_access_path),
         #     target_path_list=[people_access_path],
         #     dependent_task_list=[projection_task],
         #     task_name='calculating people access for %s' % country_name)
@@ -205,7 +222,8 @@ def main():
 
 def people_access(
         friction_raster_path, population_raster_path, habitat_raster_path,
-        max_travel_time, max_travel_distance, target_people_access_path):
+        max_travel_time, max_travel_distance_in_pixels,
+        target_people_access_path):
     """Construct a people access raster showing where people can reach.
 
     The people access raster will have a value of population count per pixel
@@ -220,8 +238,8 @@ def people_access(
             raster.
         max_travel_time (float): the maximum amount of time in minutes to
             allow when determining where population can travel to.
-        max_travel_distance (float): the maximum distance to allow for when
-            determining where population can travel to.
+        max_travel_distance_in_pixels (float): the maximum straight-line
+            pixel distance to allow. Used to define working buffers.
         target_people_access_path (str): raster created by this call that
             will contain the count of population that can reach any given
             pixel within the travel time and travel distance constraints.
@@ -236,19 +254,11 @@ def people_access(
     people_access_raster = gdal.OpenEx(
         target_people_access_path, gdal.OF_RASTER | gdal.GA_Update)
     people_access_band = people_access_raster.GetRasterBand(1)
-    people_access_nodata = people_access_band.GetNoDataValue()
+
     friction_raster_info = pygeoprocessing.get_raster_info(
         friction_raster_path)
     cell_length = friction_raster_info['pixel_size'][0]
-    max_travel_distance_in_pixels = max_travel_distance / cell_length
-    core_size = int(max_travel_distance_in_pixels*2)
-    nx, ny = friction_raster_info['raster_size']
-    LOGGER.debug('%d %d', nx, ny)
-    window_size = core_size*3
-    friction_array = numpy.empty((window_size, window_size))
-    population_array = numpy.empty((window_size, window_size))
-    habitat_array = numpy.empty((window_size, window_size))
-    LOGGER.debug('friction array size: %s', friction_array.shape)
+    raster_x_size, raster_y_size = friction_raster_info['raster_size']
 
     friction_raster = gdal.OpenEx(
         friction_raster_path, gdal.OF_RASTER)
@@ -258,73 +268,137 @@ def people_access(
     population_band = population_raster.GetRasterBand(1)
     population_nodata = population_band.GetNoDataValue()
 
-    for core_y in range(0, ny, core_size):
-        raster_y = core_y - core_size
-        raster_y_offset = 0
-        raster_win_ysize = window_size
-        if raster_y < 0:
-            raster_y_offset = abs(raster_y)
-            raster_win_ysize += raster_y
-            raster_y = 0
-        if raster_y + raster_win_ysize > ny:
-            raster_win_ysize = ny - raster_y
-        core_y_size = core_size
-        if core_y + core_y_size > ny:
-            core_y_size = ny - core_y
-        for core_x in range(0, nx, core_size):
-            raster_x = core_x - core_size
-            raster_x_offset = 0
-            raster_win_xsize = window_size
-            if raster_x < 0:
-                raster_x_offset = abs(raster_x)
-                raster_win_xsize += raster_x
-                raster_x = 0
-            if raster_x + raster_win_xsize > nx:
-                raster_win_xsize = nx - raster_x
-            core_x_size = core_size
-            if core_x + core_x_size > nx:
-                core_x_size = nx - core_x
-            friction_array[:] = numpy.nan
-            LOGGER.debug(
-                '%d:(%d)%d(%d), %d:(%d)%d(%d)',
-                raster_y, core_y, raster_win_ysize, raster_y_offset,
-                raster_x, core_x, raster_win_xsize, raster_x_offset)
+    ####################
+    n_window_x = math.ceil(MAX_WINDOW_SIZE / raster_x_size)
+    n_window_y = math.ceil(MAX_WINDOW_SIZE / raster_y_size)
 
-            friction_band.ReadAsArray(
-                xoff=raster_x, yoff=raster_y,
-                win_xsize=raster_win_xsize, win_ysize=raster_win_ysize,
-                buf_obj=friction_array[
-                    raster_y_offset:raster_y_offset+raster_win_ysize,
-                    raster_x_offset:raster_x_offset+raster_win_xsize])
-            population_array[:] = 0.0
-            population_band.ReadAsArray(
-                xoff=raster_x, yoff=raster_y,
-                win_xsize=raster_win_xsize, win_ysize=raster_win_ysize,
-                buf_obj=population_array[
-                    raster_y_offset:raster_y_offset+raster_win_ysize,
-                    raster_x_offset:raster_x_offset+raster_win_xsize])
-            total_population = numpy.sum(population_array[
-                ~numpy.isclose(population_array, population_nodata)])
+    for window_i in range(n_window_x):
+        i_offset = window_i * MAX_WINDOW_SIZE - max_travel_distance_in_pixels
+        i_size = MAX_WINDOW_SIZE
+        if i_offset < 0:
+            # shrink the size by the left margin and clamp to 0
+            i_size += i_offset
+            i_offset = 0
+        if i_offset+i_size >= raster_x_size:
+            i_size -= i_offset+i_size - raster_x_size
+
+        for window_j in range(n_window_y):
+            j_offset = window_j * MAX_WINDOW_SIZE - max_travel_distance_in_pixels
+            j_size = MAX_WINDOW_SIZE
+            if j_offset < 0:
+                # shrink the size by the left margin and clamp to 0
+                j_size += j_offset
+                j_offset = 0
+            if j_offset+j_size >= raster_y_size:
+                j_size -= j_offset+j_size - raster_y_size
+
+            friction_array = friction_band.ReadAsArray(
+                xoff=i_offset, yoff=j_offset,
+                win_xsize=i_size, win_ysize=j_size)
+            population_array = population_band.ReadAsArray(
+                xoff=i_offset, yoff=j_offset,
+                win_xsize=i_size, win_ysize=j_size)
+            pop_nodata_mask = numpy.isclose(
+                population_array, population_nodata)
+            total_population = numpy.sum(population_array[~pop_nodata_mask])
             # don't route population where there isn't any
             if total_population < POPULATION_COUNT_CUTOFF:
                 continue
 
-            population_array[
-                numpy.isclose(population_array, population_nodata)] = 0.0
-            # the nodata value is undefined but will present as 0.
-            friction_array[numpy.isclose(friction_array, 0)] = numpy.nan
-            # buffer_array[core_y:buffer_ysize, local_x:buffer_xsize]
-            LOGGER.debug(
-                'calculating population reach: core_y_size %d, '
-                'core_x_size %d core_x %d, core_y %d',
-                core_y_size, core_x_size, core_x, core_y)
-            population_reach = shortest_distances.find_population_reach(
-                friction_array, population_array, cell_length, core_size,
-                core_size, core_size, MAX_TRAVEL_TIME, MAX_TRAVEL_DISTANCE)
-            LOGGER.debug('population reach size: %s', population_reach.shape)
-            people_access_band.WriteArray(
-                population_reach[0:core_y_size, 0:core_x_size],
-                xoff=core_x, yoff=core_y)
+            # population_array[pop_nodata_mask] = 0.0
+            # # the nodata value is undefined but will present as 0.
+            # friction_array[numpy.isclose(friction_array, 0)] = numpy.nan
+
+            # population_reach = shortest_distances.find_population_reach(
+            #     friction_array, population_array, cell_length, core_size,
+            #     core_size, core_size, MAX_TRAVEL_TIME, MAX_TRAVEL_DISTANCE)
+            # LOGGER.debug('population reach size: %s', population_reach.shape)
+            # people_access_band.WriteArray(
+            #     population_reach[0:core_y_size, 0:core_x_size],
+            #     xoff=core_x, yoff=core_y)
+
+    LOGGER.info(f'done with {target_people_access_path}')
+
+    ####################
+
+
+    # friction_raster = gdal.OpenEx(
+    #     friction_raster_path, gdal.OF_RASTER)
+    # friction_band = friction_raster.GetRasterBand(1)
+    # population_raster = gdal.OpenEx(
+    #     population_raster_path, gdal.OF_RASTER)
+    # population_band = population_raster.GetRasterBand(1)
+    # population_nodata = population_band.GetNoDataValue()
+
+    # for window_y in range(0)
+
+    # for core_y in range(0, ny, core_size):
+    #     raster_y = core_y - core_size
+    #     raster_y_offset = 0
+    #     raster_win_ysize = window_size
+    #     if raster_y < 0:
+    #         raster_y_offset = abs(raster_y)
+    #         raster_win_ysize += raster_y
+    #         raster_y = 0
+    #     if raster_y + raster_win_ysize > ny:
+    #         raster_win_ysize = ny - raster_y
+    #     core_y_size = core_size
+    #     if core_y + core_y_size > ny:
+    #         core_y_size = ny - core_y
+    #     for core_x in range(0, nx, core_size):
+    #         raster_x = core_x - core_size
+    #         raster_x_offset = 0
+    #         raster_win_xsize = window_size
+    #         if raster_x < 0:
+    #             raster_x_offset = abs(raster_x)
+    #             raster_win_xsize += raster_x
+    #             raster_x = 0
+    #         if raster_x + raster_win_xsize > nx:
+    #             raster_win_xsize = nx - raster_x
+    #         core_x_size = core_size
+    #         if core_x + core_x_size > nx:
+    #             core_x_size = nx - core_x
+    #         friction_array[:] = numpy.nan
+    #         LOGGER.debug(
+    #             '%d:(%d)%d(%d), %d:(%d)%d(%d)',
+    #             raster_y, core_y, raster_win_ysize, raster_y_offset,
+    #             raster_x, core_x, raster_win_xsize, raster_x_offset)
+
+    #         friction_band.ReadAsArray(
+    #             xoff=raster_x, yoff=raster_y,
+    #             win_xsize=raster_win_xsize, win_ysize=raster_win_ysize,
+    #             buf_obj=friction_array[
+    #                 raster_y_offset:raster_y_offset+raster_win_ysize,
+    #                 raster_x_offset:raster_x_offset+raster_win_xsize])
+    #         population_array[:] = 0.0
+    #         population_band.ReadAsArray(
+    #             xoff=raster_x, yoff=raster_y,
+    #             win_xsize=raster_win_xsize, win_ysize=raster_win_ysize,
+    #             buf_obj=population_array[
+    #                 raster_y_offset:raster_y_offset+raster_win_ysize,
+    #                 raster_x_offset:raster_x_offset+raster_win_xsize])
+    #         total_population = numpy.sum(population_array[
+    #             ~numpy.isclose(population_array, population_nodata)])
+    #         # don't route population where there isn't any
+    #         if total_population < POPULATION_COUNT_CUTOFF:
+    #             continue
+
+    #         population_array[
+    #             numpy.isclose(population_array, population_nodata)] = 0.0
+    #         # the nodata value is undefined but will present as 0.
+    #         friction_array[numpy.isclose(friction_array, 0)] = numpy.nan
+    #         # buffer_array[core_y:buffer_ysize, local_x:buffer_xsize]
+    #         LOGGER.debug(
+    #             'calculating population reach: core_y_size %d, '
+    #             'core_x_size %d core_x %d, core_y %d',
+    #             core_y_size, core_x_size, core_x, core_y)
+    #         population_reach = shortest_distances.find_population_reach(
+    #             friction_array, population_array, cell_length, core_size,
+    #             core_size, core_size, MAX_TRAVEL_TIME, MAX_TRAVEL_DISTANCE)
+    #         LOGGER.debug('population reach size: %s', population_reach.shape)
+    #         people_access_band.WriteArray(
+    #             population_reach[0:core_y_size, 0:core_x_size],
+    #             xoff=core_x, yoff=core_y)
 
 
 def find_shortest_distances(
