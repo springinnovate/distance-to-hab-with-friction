@@ -134,7 +134,20 @@ def main():
         epsg_code = int('32%d%02d' % (lat_code, utm_code))
         utm_srs = osr.SpatialReference()
         utm_srs.ImportFromEPSG(epsg_code)
-        utm_srs.ImportFromEPSG(54008)  # override sinusoidal
+        # override sinusoidal
+        sinusoidal_srs = osr.SpatialReference()
+        sinusoidal_srs.ImportFromWkt("""PROJCS["World_Sinusoidal",
+            GEOGCS["GCS_WGS_1984",
+                DATUM["WGS_1984",
+                    SPHEROID["WGS_1984",6378137,298.257223563]],
+                PRIMEM["Greenwich",0],
+                UNIT["Degree",0.017453292519943295]],
+            PROJECTION["Sinusoidal"],
+            PARAMETER["False_Easting",0],
+            PARAMETER["False_Northing",0],
+            PARAMETER["Central_Meridian",0],
+            UNIT["Meter",1],
+            AUTHORITY["EPSG","54008"]]""")
 
         area_fid_list.append((
             country_geom.GetArea(), utm_srs.ExportToWkt(), country_name,
