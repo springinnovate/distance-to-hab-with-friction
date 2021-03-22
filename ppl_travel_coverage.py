@@ -91,7 +91,7 @@ def get_min_nonzero_raster_value(raster_path):
         f'nodata: {nodata}\n'
         f'array: {array}')
     min_value = numpy.min(array[
-        valid_mask & numpy.isfinite(array) & array > 0])
+        valid_mask & numpy.isfinite(array) & (array > 0)])
     band = None
     raster = None
     return min_value
