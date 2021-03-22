@@ -58,7 +58,7 @@ def find_population_reach(
                 continue
             pop_coverage[i, j] = population_val
 
-    return return pop_coverage
+    return pop_coverage
     ##########
     cdef int win_xsize, win_ysize
     win_xsize = friction_array.shape[1]
