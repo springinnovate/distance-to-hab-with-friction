@@ -221,7 +221,7 @@ def main():
         people_access_path = os.path.join(
             country_workspace, 'people_access_%s.tif' % country_name)
         min_friction = get_min_raster_value(sinusoidal_friction_path)
-        max_travel_distance_in_pixels = (
+        max_travel_distance_in_pixels = math.ceil(
             1/min_friction*MAX_TRAVEL_TIME/TARGET_CELL_LENGTH_M)
         people_access_task = task_graph.add_task(
             func=people_access,
