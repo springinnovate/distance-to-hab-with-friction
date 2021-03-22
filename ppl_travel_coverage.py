@@ -334,10 +334,14 @@ def people_access(
                 j_offset, i_size, j_size, MAX_TRAVEL_TIME,
                 MAX_TRAVEL_DISTANCE)
             LOGGER.debug('population reach size: %s', population_reach.shape)
+            current_pop_reach = people_access_band.ReadAsArray(
+                xoff=i_offset, yoff=j_offset,
+                win_xsize=i_size, win_ysize=j_size)
+            valid_mask = population_reach > 0
+            current_pop_reach[(current_pop_reach == -1) & valid_mask] = 0
+            current_pop_reach[valid_mask] += population_reach[valid_mask]
             people_access_band.WriteArray(
-                population_reach[
-                    i_offset:i_offset+i_size, j_offset:j_offset+j_size],
-                xoff=i_size, yoff=j_size)
+                current_pop_reach, xoff=i_offset, yoff=j_offset)
 
     LOGGER.info(f'done with {target_people_access_path}')
 
