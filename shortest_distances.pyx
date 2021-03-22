@@ -22,6 +22,7 @@ LOGGER = logging.getLogger(__name__)
 def find_population_reach(
         numpy.ndarray[double, ndim=2] friction_array,
         numpy.ndarray[double, ndim=2] population_array,
+        array_shape,
         double cell_length, int core_i, int core_j,
         int core_size_i, int core_size_j,
         double max_time, double max_travel_distance):
@@ -32,6 +33,8 @@ def find_population_reach(
             determining lcp in units minutes/meter.
         population_array (numpy.ndarray): array with population values per
             pixel.
+        array_shape (tuple): an (j, i) size of the shape of the incoming
+            arrays.
         cell_length (double): length of cell in meters.
         core_x/core_y (int): defines the ul corner of the core in friction
             array

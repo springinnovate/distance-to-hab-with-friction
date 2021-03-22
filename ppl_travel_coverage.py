@@ -328,7 +328,8 @@ def people_access(
             friction_array[numpy.isclose(friction_array, 0)] = numpy.nan
 
             population_reach = shortest_distances.find_population_reach(
-                friction_array, population_array, cell_length, i_offset,
+                friction_array, population_array, friction_array.shape,
+                cell_length, i_offset,
                 j_offset, i_size, j_size, MAX_TRAVEL_TIME,
                 MAX_TRAVEL_DISTANCE)
             LOGGER.debug('population reach size: %s', population_reach.shape)
