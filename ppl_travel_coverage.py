@@ -150,8 +150,8 @@ def main():
             AUTHORITY["EPSG","54008"]]""")
 
         area_fid_list.append((
-            country_geom.GetArea(), utm_srs.ExportToWkt(), country_name,
-            country_feature.GetFID()))
+            country_geom.GetArea(), sinusoidal_srs.ExportToWkt(),
+            country_name, country_feature.GetFID()))
 
     world_borders_layer.ResetReading()
 
