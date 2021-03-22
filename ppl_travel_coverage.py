@@ -286,12 +286,12 @@ def people_access(
     population_band = population_raster.GetRasterBand(1)
     population_nodata = population_band.GetNoDataValue()
 
-    n_window_x = math.ceil(MAX_WINDOW_SIZE / raster_x_size)
-    n_window_y = math.ceil(MAX_WINDOW_SIZE / raster_y_size)
+    n_window_x = math.ceil(raster_x_size / MAX_WINDOW_SIZE)
+    n_window_y = math.ceil(raster_y_size / MAX_WINDOW_SIZE)
 
     for window_i in range(n_window_x):
         i_offset = window_i * MAX_WINDOW_SIZE - max_travel_distance_in_pixels
-        i_size = MAX_WINDOW_SIZE
+        i_size = MAX_WINDOW_SIZE + 2*max_travel_distance_in_pixels
         if i_offset < 0:
             # shrink the size by the left margin and clamp to 0
             i_size += i_offset
@@ -302,7 +302,7 @@ def people_access(
         for window_j in range(n_window_y):
             j_offset = (
                 window_j * MAX_WINDOW_SIZE - max_travel_distance_in_pixels)
-            j_size = MAX_WINDOW_SIZE
+            j_size = MAX_WINDOW_SIZE + 2*max_travel_distance_in_pixels
             if j_offset < 0:
                 # shrink the size by the left margin and clamp to 0
                 j_size += j_offset
