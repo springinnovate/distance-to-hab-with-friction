@@ -294,19 +294,24 @@ def people_access(
     n_window_x = math.ceil(raster_x_size / MAX_WINDOW_SIZE)
     n_window_y = math.ceil(raster_y_size / MAX_WINDOW_SIZE)
 
+
     for window_i in range(n_window_x):
-        i_offset = window_i * MAX_WINDOW_SIZE - max_travel_distance_in_pixels
+        i_core = window_i * MAX_WINDOW_SIZE
+        i_offset = i_core - max_travel_distance_in_pixels
         i_size = MAX_WINDOW_SIZE + 2*max_travel_distance_in_pixels
         if i_offset < 0:
             # shrink the size by the left margin and clamp to 0
             i_size += i_offset
             i_offset = 0
+        if i_core+i_size >= raster_x_size:
+            i_core -= i_core+i_size - raster_x_size
         if i_offset+i_size >= raster_x_size:
             i_size -= i_offset+i_size - raster_x_size
 
         for window_j in range(n_window_y):
+            j_core = window_j * MAX_WINDOW_SIZE
             j_offset = (
-                window_j * MAX_WINDOW_SIZE - max_travel_distance_in_pixels)
+                j_core - max_travel_distance_in_pixels)
             j_size = MAX_WINDOW_SIZE + 2*max_travel_distance_in_pixels
             if j_offset < 0:
                 # shrink the size by the left margin and clamp to 0
@@ -341,8 +346,10 @@ def people_access(
 
             population_reach = shortest_distances.find_population_reach(
                 friction_array, population_array, friction_array.shape,
-                cell_length, i_offset,
-                j_offset, i_size, j_size, MAX_TRAVEL_TIME,
+                cell_length, i_core,
+                j_core, max_travel_distance_in_pixels,
+                max_travel_distance_in_pixels,
+                MAX_TRAVEL_TIME,
                 MAX_TRAVEL_DISTANCE)
             LOGGER.debug('population reach size: %s', population_reach.shape)
             current_pop_reach = people_access_band.ReadAsArray(

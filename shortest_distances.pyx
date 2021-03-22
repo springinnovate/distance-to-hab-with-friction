@@ -38,7 +38,8 @@ def find_population_reach(
         cell_length (double): length of cell in meters.
         core_x/core_y (int): defines the ul corner of the core in friction
             array
-        core_size (int): defines the w/h of the core slice in friction_array.
+        core_size_i/j (int): defines the w/h of the core slice in
+            friction_array.
         max_time (double): the time allowed when computing population reach.
         max_travel_distance (double): the maximum distance allowed to travel
              in meters.
@@ -56,10 +57,10 @@ def find_population_reach(
 
     for i in range(core_i, core_i+core_size_i):
         for j in range(core_j, core_j+core_size_j):
-            population_val = population_array[i, j]
+            population_val = population_array[j, i]
             if population_val <= 0:
                 continue
-            pop_coverage[i, j] = population_val
+            pop_coverage[j, i] = population_val
 
     return pop_coverage
     ##########
