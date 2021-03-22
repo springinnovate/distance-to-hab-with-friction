@@ -134,6 +134,7 @@ def main():
         epsg_code = int('32%d%02d' % (lat_code, utm_code))
         utm_srs = osr.SpatialReference()
         utm_srs.ImportFromEPSG(epsg_code)
+        utm_srs.ImportFromEPSG(54008)  # override sinusoidal
 
         area_fid_list.append((
             country_geom.GetArea(), utm_srs.ExportToWkt(), country_name,
@@ -145,7 +146,7 @@ def main():
         ecoshard_path_map['population_2017'])
     for country_index, (
             country_area, utm_wkt, country_name, country_fid) in enumerate(
-                sorted(area_fid_list)):
+                sorted(area_fid_list, reverse=True)):
         # put the index on there so we can see which one is done first
         country_workspace = os.path.join(
             COUNTRY_WORKSPACE_DIR, f'{country_index}_{country_name}')
