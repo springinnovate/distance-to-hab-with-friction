@@ -312,6 +312,7 @@ def people_access(
 
             LOGGER.debug(
                 f'window_i/j: {window_i},{window_j}\n'
+                f'n_window_x/y: {n_window_x},{n_window_y}\n'
                 f'i/j_size: {i_size},{j_size}\n'
                 f'i/j_offset: {i_offset},{j_offset}\n'
                 f'raster_x/y_size: {raster_x_size},{raster_y_size}')
