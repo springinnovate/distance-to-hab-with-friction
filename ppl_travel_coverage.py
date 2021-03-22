@@ -232,6 +232,7 @@ def main():
                 max_travel_distance_in_pixels, people_access_path),
             target_path_list=[people_access_path],
             dependent_task_list=[projection_task],
+            transient_run=True,
             task_name='calculating people access for %s' % country_name)
 
     task_graph.close()
