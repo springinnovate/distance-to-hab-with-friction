@@ -52,7 +52,7 @@ def find_population_reach(
     cdef double diagonal_cell_length = 2**0.5 * cell_length
     cdef int i, j
     cdef numpy.ndarray[double, ndim=2] pop_coverage = numpy.zeros(
-        friction_array.shape)
+        array_shape)
 
     for i in range(core_i, core_i+core_size_i):
         for j in range(core_j, core_j+core_size_j):
