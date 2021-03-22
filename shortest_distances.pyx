@@ -45,8 +45,21 @@ def find_population_reach(
         friction array.
 
     """
-    return population_array
     start_time = time.time()
+    cdef double diagonal_cell_length = 2**0.5 * cell_length
+    cdef int i, j
+    cdef numpy.ndarray[double, ndim=2] pop_coverage = numpy.zeros(
+        friction_array.shape)
+
+    for i in range(core_i, core_i+core_size_i):
+        for j in range(core_j, core_j+core_size_j):
+            population_val = population_array[i, j]
+            if population_val <= 0:
+                continue
+            pop_coverage[i, j] = population_val
+
+    return return pop_coverage
+    ##########
     cdef int win_xsize, win_ysize
     win_xsize = friction_array.shape[1]
     win_ysize = friction_array.shape[0]
