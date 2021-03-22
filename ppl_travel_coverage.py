@@ -82,11 +82,15 @@ def get_min_raster_value(raster_path):
     band = raster.GetRasterBand(1)
     nodata = band.GetNoDataValue()
     array = band.ReadAsArray()
+    if nodata is not None:
+        nodata_mask = numpy.isclose(array, nodata)
+    else:
+        nodata_mask = numpy.zeros(array.shape, dtype=bool)
     LOGGER.debug(
         f'nodata: {nodata}\n'
         f'array: {array}')
     min_value = numpy.min(
-        array[~numpy.isclose(array, nodata) & numpy.isfinite(array)])
+        array[nodata_mask & numpy.isfinite(array)])
     band = None
     raster = None
     return min_value
