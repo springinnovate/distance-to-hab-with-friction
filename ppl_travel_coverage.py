@@ -1,5 +1,6 @@
 """Distance to habitat with a friction layer."""
 import datetime
+import math
 import multiprocessing
 import time
 import os
@@ -119,8 +120,7 @@ def main():
 
     area_fid_list = []
 
-    sinusoidal_srs = osr.SpatialReference()
-    sinusoidal_srs.ImportFromWkt("""PROJCS["World_Sinusoidal",
+    sinusoidal_wkt = """PROJCS["World_Sinusoidal",
         GEOGCS["GCS_WGS_1984",
             DATUM["WGS_1984",
                 SPHEROID["WGS_1984",6378137,298.257223563]],
@@ -131,8 +131,7 @@ def main():
         PARAMETER["False_Northing",0],
         PARAMETER["Central_Meridian",0],
         UNIT["Meter",1],
-        AUTHORITY["EPSG","54008"]]""")
-
+        AUTHORITY["EPSG","54008"]]"""
 
     for country_feature in world_borders_layer:
         country_name = country_feature.GetField('NAME')
@@ -145,7 +144,7 @@ def main():
         country_geom = country_feature.GetGeometryRef()
 
         area_fid_list.append((
-            country_geom.GetArea(), sinusoidal_srs.ExportToWkt(),
+            country_geom.GetArea(), sinusoidal_wkt,
             country_name, country_feature.GetFID()))
 
     world_borders_layer.ResetReading()
@@ -192,44 +191,47 @@ def main():
         target_bounding_box[3] += target_bounding_box[3] % TARGET_CELL_LENGTH_M
         LOGGER.debug(f'projected country_bb: {target_bounding_box}')
 
-        utm_friction_path = os.path.join(
-            country_workspace, 'utm_%s_friction.tif' % country_name)
-        utm_population_path = os.path.join(
-            country_workspace, 'utm_%s_population.tif' % country_name)
-        utm_hab_path = os.path.join(
-            country_workspace, 'utm_%s_hab.tif' % country_name)
-        utm_raster_path_list = [
-            utm_friction_path, utm_population_path, utm_hab_path]
+        sinusoidal_friction_path = os.path.join(
+            country_workspace, 'sinusoidal_%s_friction.tif' % country_name)
+        sinusoidal_population_path = os.path.join(
+            country_workspace, 'sinusoidal_%s_population.tif' % country_name)
+        sinusoidal_hab_path = os.path.join(
+            country_workspace, 'sinusoidal_%s_hab.tif' % country_name)
+        sinusoidal_raster_path_list = [
+            sinusoidal_friction_path, sinusoidal_population_path,
+            sinusoidal_hab_path]
 
         projection_task = task_graph.add_task(
             func=pygeoprocessing.align_and_resize_raster_stack,
             args=(
-                base_raster_path_list, utm_raster_path_list,
+                base_raster_path_list, sinusoidal_raster_path_list,
                 ['near']*len(base_raster_path_list),
                 (TARGET_CELL_LENGTH_M, -TARGET_CELL_LENGTH_M),
                 target_bounding_box),
             kwargs={
-                'target_projection_wkt': utm_wkt,
+                'target_projection_wkt': sinusoidal_wkt,
                 'vector_mask_options': {
                     'mask_vector_path': ecoshard_path_map['world_borders'],
                     'mask_vector_where_filter': f'"fid"={country_fid}'
                 }
             },
-            target_path_list=utm_raster_path_list,
+            target_path_list=sinusoidal_raster_path_list,
             task_name=f'project and clip rasters for {country_name}')
 
         people_access_path = os.path.join(
             country_workspace, 'people_access_%s.tif' % country_name)
-        min_friction = get_min_raster_value(utm_friction_path)
-        max_travel_distance_in_pixels = 1/min_friction*MAX_TRAVEL_TIME/TARGET_CELL_LENGTH_M
-        # people_access_task = task_graph.add_task(
-        #     func=people_access,
-        #     args=(
-        #         utm_friction_path, utm_population_path, utm_hab_path,
-        #         MAX_TRAVEL_TIME, max_travel_distance_in_pixels, people_access_path),
-        #     target_path_list=[people_access_path],
-        #     dependent_task_list=[projection_task],
-        #     task_name='calculating people access for %s' % country_name)
+        min_friction = get_min_raster_value(sinusoidal_friction_path)
+        max_travel_distance_in_pixels = (
+            1/min_friction*MAX_TRAVEL_TIME/TARGET_CELL_LENGTH_M)
+        people_access_task = task_graph.add_task(
+            func=people_access,
+            args=(
+                sinusoidal_friction_path, sinusoidal_population_path,
+                sinusoidal_hab_path, MAX_TRAVEL_TIME,
+                max_travel_distance_in_pixels, people_access_path),
+            target_path_list=[people_access_path],
+            dependent_task_list=[projection_task],
+            task_name='calculating people access for %s' % country_name)
 
     task_graph.close()
     task_graph.join()
@@ -298,7 +300,8 @@ def people_access(
             i_size -= i_offset+i_size - raster_x_size
 
         for window_j in range(n_window_y):
-            j_offset = window_j * MAX_WINDOW_SIZE - max_travel_distance_in_pixels
+            j_offset = (
+                window_j * MAX_WINDOW_SIZE - max_travel_distance_in_pixels)
             j_size = MAX_WINDOW_SIZE
             if j_offset < 0:
                 # shrink the size by the left margin and clamp to 0
@@ -320,100 +323,21 @@ def people_access(
             if total_population < POPULATION_COUNT_CUTOFF:
                 continue
 
-            # population_array[pop_nodata_mask] = 0.0
+            population_array[pop_nodata_mask] = 0.0
             # # the nodata value is undefined but will present as 0.
-            # friction_array[numpy.isclose(friction_array, 0)] = numpy.nan
+            friction_array[numpy.isclose(friction_array, 0)] = numpy.nan
 
-            # population_reach = shortest_distances.find_population_reach(
-            #     friction_array, population_array, cell_length, core_size,
-            #     core_size, core_size, MAX_TRAVEL_TIME, MAX_TRAVEL_DISTANCE)
-            # LOGGER.debug('population reach size: %s', population_reach.shape)
-            # people_access_band.WriteArray(
-            #     population_reach[0:core_y_size, 0:core_x_size],
-            #     xoff=core_x, yoff=core_y)
+            population_reach = shortest_distances.find_population_reach(
+                friction_array, population_array, cell_length, i_offset,
+                j_offset, i_size, j_size, MAX_TRAVEL_TIME,
+                MAX_TRAVEL_DISTANCE)
+            LOGGER.debug('population reach size: %s', population_reach.shape)
+            people_access_band.WriteArray(
+                population_reach[
+                    i_offset:i_offset+i_size, j_offset:j_offset+j_size],
+                xoff=i_size, yoff=j_size)
 
     LOGGER.info(f'done with {target_people_access_path}')
-
-    ####################
-
-
-    # friction_raster = gdal.OpenEx(
-    #     friction_raster_path, gdal.OF_RASTER)
-    # friction_band = friction_raster.GetRasterBand(1)
-    # population_raster = gdal.OpenEx(
-    #     population_raster_path, gdal.OF_RASTER)
-    # population_band = population_raster.GetRasterBand(1)
-    # population_nodata = population_band.GetNoDataValue()
-
-    # for window_y in range(0)
-
-    # for core_y in range(0, ny, core_size):
-    #     raster_y = core_y - core_size
-    #     raster_y_offset = 0
-    #     raster_win_ysize = window_size
-    #     if raster_y < 0:
-    #         raster_y_offset = abs(raster_y)
-    #         raster_win_ysize += raster_y
-    #         raster_y = 0
-    #     if raster_y + raster_win_ysize > ny:
-    #         raster_win_ysize = ny - raster_y
-    #     core_y_size = core_size
-    #     if core_y + core_y_size > ny:
-    #         core_y_size = ny - core_y
-    #     for core_x in range(0, nx, core_size):
-    #         raster_x = core_x - core_size
-    #         raster_x_offset = 0
-    #         raster_win_xsize = window_size
-    #         if raster_x < 0:
-    #             raster_x_offset = abs(raster_x)
-    #             raster_win_xsize += raster_x
-    #             raster_x = 0
-    #         if raster_x + raster_win_xsize > nx:
-    #             raster_win_xsize = nx - raster_x
-    #         core_x_size = core_size
-    #         if core_x + core_x_size > nx:
-    #             core_x_size = nx - core_x
-    #         friction_array[:] = numpy.nan
-    #         LOGGER.debug(
-    #             '%d:(%d)%d(%d), %d:(%d)%d(%d)',
-    #             raster_y, core_y, raster_win_ysize, raster_y_offset,
-    #             raster_x, core_x, raster_win_xsize, raster_x_offset)
-
-    #         friction_band.ReadAsArray(
-    #             xoff=raster_x, yoff=raster_y,
-    #             win_xsize=raster_win_xsize, win_ysize=raster_win_ysize,
-    #             buf_obj=friction_array[
-    #                 raster_y_offset:raster_y_offset+raster_win_ysize,
-    #                 raster_x_offset:raster_x_offset+raster_win_xsize])
-    #         population_array[:] = 0.0
-    #         population_band.ReadAsArray(
-    #             xoff=raster_x, yoff=raster_y,
-    #             win_xsize=raster_win_xsize, win_ysize=raster_win_ysize,
-    #             buf_obj=population_array[
-    #                 raster_y_offset:raster_y_offset+raster_win_ysize,
-    #                 raster_x_offset:raster_x_offset+raster_win_xsize])
-    #         total_population = numpy.sum(population_array[
-    #             ~numpy.isclose(population_array, population_nodata)])
-    #         # don't route population where there isn't any
-    #         if total_population < POPULATION_COUNT_CUTOFF:
-    #             continue
-
-    #         population_array[
-    #             numpy.isclose(population_array, population_nodata)] = 0.0
-    #         # the nodata value is undefined but will present as 0.
-    #         friction_array[numpy.isclose(friction_array, 0)] = numpy.nan
-    #         # buffer_array[core_y:buffer_ysize, local_x:buffer_xsize]
-    #         LOGGER.debug(
-    #             'calculating population reach: core_y_size %d, '
-    #             'core_x_size %d core_x %d, core_y %d',
-    #             core_y_size, core_x_size, core_x, core_y)
-    #         population_reach = shortest_distances.find_population_reach(
-    #             friction_array, population_array, cell_length, core_size,
-    #             core_size, core_size, MAX_TRAVEL_TIME, MAX_TRAVEL_DISTANCE)
-    #         LOGGER.debug('population reach size: %s', population_reach.shape)
-    #         people_access_band.WriteArray(
-    #             population_reach[0:core_y_size, 0:core_x_size],
-    #             xoff=core_x, yoff=core_y)
 
 
 def find_shortest_distances(

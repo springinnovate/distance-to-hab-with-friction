@@ -22,7 +22,8 @@ LOGGER = logging.getLogger(__name__)
 def find_population_reach(
         numpy.ndarray[double, ndim=2] friction_array,
         numpy.ndarray[double, ndim=2] population_array,
-        double cell_length, int core_x, int core_y, int core_size,
+        double cell_length, int core_i, int core_j,
+        int core_size_i, int core_size_j,
         double max_time, double max_travel_distance):
     """Define later
 
@@ -44,6 +45,7 @@ def find_population_reach(
         friction array.
 
     """
+    return population_array
     start_time = time.time()
     cdef int win_xsize, win_ysize
     win_xsize = friction_array.shape[1]
