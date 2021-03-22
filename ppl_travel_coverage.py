@@ -118,6 +118,22 @@ def main():
     world_borders_layer = world_borders_vector.GetLayer()
 
     area_fid_list = []
+
+    sinusoidal_srs = osr.SpatialReference()
+    sinusoidal_srs.ImportFromWkt("""PROJCS["World_Sinusoidal",
+        GEOGCS["GCS_WGS_1984",
+            DATUM["WGS_1984",
+                SPHEROID["WGS_1984",6378137,298.257223563]],
+            PRIMEM["Greenwich",0],
+            UNIT["Degree",0.017453292519943295]],
+        PROJECTION["Sinusoidal"],
+        PARAMETER["False_Easting",0],
+        PARAMETER["False_Northing",0],
+        PARAMETER["Central_Meridian",0],
+        UNIT["Meter",1],
+        AUTHORITY["EPSG","54008"]]""")
+
+
     for country_feature in world_borders_layer:
         country_name = country_feature.GetField('NAME')
         if country_name in SKIP_THESE_COUNTRIES:
@@ -127,27 +143,6 @@ def main():
 
         LOGGER.debug(country_name)
         country_geom = country_feature.GetGeometryRef()
-        # find EPSG code that would be central to the country
-        centroid_geom = country_geom.Centroid()
-        utm_code = (numpy.floor((centroid_geom.GetX()+180)/6) % 60)+1
-        lat_code = 6 if centroid_geom.GetY() > 0 else 7
-        epsg_code = int('32%d%02d' % (lat_code, utm_code))
-        utm_srs = osr.SpatialReference()
-        utm_srs.ImportFromEPSG(epsg_code)
-        # override sinusoidal
-        sinusoidal_srs = osr.SpatialReference()
-        sinusoidal_srs.ImportFromWkt("""PROJCS["World_Sinusoidal",
-            GEOGCS["GCS_WGS_1984",
-                DATUM["WGS_1984",
-                    SPHEROID["WGS_1984",6378137,298.257223563]],
-                PRIMEM["Greenwich",0],
-                UNIT["Degree",0.017453292519943295]],
-            PROJECTION["Sinusoidal"],
-            PARAMETER["False_Easting",0],
-            PARAMETER["False_Northing",0],
-            PARAMETER["Central_Meridian",0],
-            UNIT["Meter",1],
-            AUTHORITY["EPSG","54008"]]""")
 
         area_fid_list.append((
             country_geom.GetArea(), sinusoidal_srs.ExportToWkt(),
