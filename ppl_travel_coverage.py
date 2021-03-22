@@ -225,6 +225,8 @@ def main():
         max_travel_distance_in_pixels = math.ceil(
             1/min_friction*MAX_TRAVEL_TIME/TARGET_CELL_LENGTH_M)
         LOGGER.debug(
+            f'min_friction: {min_friction}\n'
+            f'max_travel_time: {MAX_TRAVEL_TIME}\n'
             f'max_travel_distance_in_pixels {max_travel_distance_in_pixels}')
         people_access_task = task_graph.add_task(
             func=people_access,
