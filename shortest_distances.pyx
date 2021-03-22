@@ -20,8 +20,8 @@ LOGGER = logging.getLogger(__name__)
 
 
 def find_population_reach(
-        numpy.ndarray[double, ndim=2] friction_array,
-        numpy.ndarray[double, ndim=2] population_array,
+        numpy.ndarray[float, ndim=2] friction_array,
+        numpy.ndarray[float, ndim=2] population_array,
         array_shape,
         double cell_length, int core_i, int core_j,
         int core_size_i, int core_size_j,
