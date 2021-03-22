@@ -286,7 +286,6 @@ def people_access(
     population_band = population_raster.GetRasterBand(1)
     population_nodata = population_band.GetNoDataValue()
 
-    ####################
     n_window_x = math.ceil(MAX_WINDOW_SIZE / raster_x_size)
     n_window_y = math.ceil(MAX_WINDOW_SIZE / raster_y_size)
 
@@ -310,6 +309,12 @@ def people_access(
                 j_offset = 0
             if j_offset+j_size >= raster_y_size:
                 j_size -= j_offset+j_size - raster_y_size
+
+            LOGGER.debug(
+                f'window_i/j: {window_i},{window_j}\n'
+                f'i/j_size: {i_size},{j_size}\n'
+                f'i/j_offset: {i_offset},{j_offset}\n'
+                f'raster_x/y_size: {raster_x_size},{raster_y_size}')
 
             friction_array = friction_band.ReadAsArray(
                 xoff=i_offset, yoff=j_offset,
