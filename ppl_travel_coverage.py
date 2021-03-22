@@ -77,7 +77,7 @@ SKIP_THESE_COUNTRIES = [
     ]
 
 
-def get_min_raster_value(raster_path):
+def get_min_nonzero_raster_value(raster_path):
     """Return minimum non-nodata value in raster."""
     raster = gdal.OpenEx(raster_path, gdal.OF_RASTER)
     band = raster.GetRasterBand(1)
@@ -90,7 +90,8 @@ def get_min_raster_value(raster_path):
     LOGGER.debug(
         f'nodata: {nodata}\n'
         f'array: {array}')
-    min_value = numpy.min(array[valid_mask & numpy.isfinite(array)])
+    min_value = numpy.min(array[
+        valid_mask & numpy.isfinite(array) & array > 0])
     band = None
     raster = None
     return min_value
@@ -220,7 +221,7 @@ def main():
 
         people_access_path = os.path.join(
             country_workspace, 'people_access_%s.tif' % country_name)
-        min_friction = get_min_raster_value(sinusoidal_friction_path)
+        min_friction = get_min_nonzero_raster_value(sinusoidal_friction_path)
         max_travel_distance_in_pixels = math.ceil(
             1/min_friction*MAX_TRAVEL_TIME/TARGET_CELL_LENGTH_M)
         people_access_task = task_graph.add_task(
