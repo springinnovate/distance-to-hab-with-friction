@@ -16,9 +16,7 @@ import ecoshard
 import taskgraph
 import scipy.sparse.csgraph
 
-import pyximport; pyximport.install()
-
-import shortest_distances
+from . import shortest_distances
 
 gdal.SetCacheMax(2**27)
 
