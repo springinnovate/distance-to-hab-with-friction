@@ -12,6 +12,39 @@ import numpy
 cimport numpy
 from libc.time cimport time as ctime
 from libc.time cimport time_t
+from libcpp.deque cimport deque
+
+# exposing stl::priority_queue so we can have all 3 template arguments so
+# we can pass a different Compare functor
+cdef extern from "<queue>" namespace "std" nogil:
+    cdef cppclass priority_queue[T, Container, Compare]:
+        priority_queue() except +
+        priority_queue(priority_queue&) except +
+        priority_queue(Container&)
+        bint empty()
+        void pop()
+        void push(T&)
+        size_t size()
+        T& top()
+
+# this is the class type that'll get stored in the priority queue
+cdef struct ValuePixelType:
+    double value  # pixel value
+    int i  # pixel i coordinate in the raster
+    int j  # pixel j coordinate in the raster
+
+
+# this type is used to create a priority queue on a time/coordinate type
+ctypedef priority_queue[
+    ValuePixelType, deque[ValuePixelType], LessPixel] DistPriorityQueueType
+
+# functor for priority queue of pixels
+cdef cppclass LessPixel nogil:
+    bint get "operator()"(ValuePixelType& lhs, ValuePixelType& rhs):
+        if lhs.value < rhs.value:
+            return 1
+        return 0
+
 
 logging.basicConfig(
     level=logging.DEBUG,
@@ -61,7 +94,7 @@ def find_population_reach(
         f'core_size_i, core_size_j: {core_size_i},{core_size_j}\n'
         f'n_rows, n_cols: {n_rows},{n_cols}')
 
-    cdef list time_heap = []
+    #cdef list time_heap = []
     cdef int *ioff = [1, 1, 0, -1, -1, -1, 0, 1]
     cdef int *joff = [0, 1, 1, 1, 0, -1, -1, -1]
     cdef float *dist_edge = [
@@ -77,20 +110,30 @@ def find_population_reach(
     cdef int i_start, j_start, i_n, j_n, n_steps
     cdef time_t last_log_time
 
+    cdef DistPriorityQueueType dist_queue
+    cdef ValuePixelType pixel
+
     for i_start in range(core_i, core_i+core_size_i):
         for j_start in range(core_j, core_j+core_size_j):
             population_val = population_array[j_start, i_start]
             if population_val <= 0:
                 continue
             visited = numpy.zeros((n_rows, n_cols), dtype=bool)
-            time_heap = [(0, (j_start, i_start))]
+            # time_heap = [(0, (j_start, i_start))]
+            pixel = ValuePixelType(0, i_start, j_start)
+            dist_queue.push(pixel)
 
             # c_ -- current, n_ -- neighbor
             last_log_time = ctime(NULL)
             n_steps = 0
             LOGGER.info(f'Processing {j_start}, {i_start} for {n_steps}')
-            while time_heap:
-                c_time, (j, i) = heapq.heappop(time_heap)
+            while dist_queue.size() > 0:
+                #c_time, (j, i) = heapq.heappop(time_heap)
+                pixel = dist_queue.top()
+                dist_queue.pop()
+                c_time = pixel.value
+                i = pixel.i
+                j = pixel.j
                 visited[j, i] = True
                 n_steps += 1
                 if ctime(NULL) - last_log_time > 5.0:
@@ -112,7 +155,9 @@ def find_population_reach(
                         continue
                     n_time = c_time + frict_n*dist_edge[v]
                     if n_time <= max_time:
-                        heapq.heappush(time_heap, (n_time, (j_n, i_n)))
+                        # heapq.heappush(time_heap, (n_time, (j_n, i_n)))
+                        pixel = ValuePixelType(n_time, i_n, j_n)
+                        dist_queue.push(pixel)
             pop_coverage += population_val * visited
     LOGGER.debug(
         f'completed ({core_i}, {core_j}) in {time.time()-start_time}s')
