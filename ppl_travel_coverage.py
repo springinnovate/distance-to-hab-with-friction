@@ -361,8 +361,7 @@ def people_access(
                 i_core_size, j_core_size,
                 friction_array.shape[1],
                 friction_array.shape[0],
-                MAX_TRAVEL_TIME,
-                MAX_TRAVEL_DISTANCE)
+                MAX_TRAVEL_TIME)
             LOGGER.debug('population reach size: %s', population_reach.shape)
             current_pop_reach = people_access_band.ReadAsArray(
                 xoff=i_offset, yoff=j_offset,
