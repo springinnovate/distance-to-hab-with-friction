@@ -305,9 +305,9 @@ def people_access(
             i_offset = 0
 
         if i_core+i_core_size >= raster_x_size:
-            i_core_size -= i_core+i_core_size - raster_x_size - 1
+            i_core_size -= i_core+i_core_size - raster_x_size + 1
         if i_offset+i_size >= raster_x_size:
-            i_size -= i_offset+i_size - raster_x_size - 1
+            i_size -= i_offset+i_size - raster_x_size + 1
 
         for window_j in range(n_window_y):
             j_core = window_j * CORE_SIZE
@@ -321,9 +321,9 @@ def people_access(
                 j_offset = 0
 
             if j_core+j_core_size >= raster_y_size:
-                j_core_size -= j_core+j_core_size - raster_y_size - 1
+                j_core_size -= j_core+j_core_size - raster_y_size + 1
             if j_offset+j_size >= raster_y_size:
-                j_size -= j_offset+j_size - raster_y_size - 1
+                j_size -= j_offset+j_size - raster_y_size + 1
 
             LOGGER.debug(
                 f'window_i/j: {window_i},{window_j}\n'
