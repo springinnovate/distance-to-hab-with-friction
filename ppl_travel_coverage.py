@@ -45,7 +45,7 @@ POPULATION_COUNT_CUTOFF = 0
 # local distance pixel size
 TARGET_CELL_LENGTH_M = 1000
 # maximum window size to process one set of travel times over
-MAX_WINDOW_SIZE = 100
+CORE_SIZE = 100
 
 TASKGRAPH_WORKERS = int(sys.argv[1])  # multiprocessing.cpu_count()
 
@@ -291,14 +291,13 @@ def people_access(
     population_band = population_raster.GetRasterBand(1)
     population_nodata = population_band.GetNoDataValue()
 
-    n_window_x = math.ceil(raster_x_size / MAX_WINDOW_SIZE)
-    n_window_y = math.ceil(raster_y_size / MAX_WINDOW_SIZE)
-
+    n_window_x = math.ceil(raster_x_size / CORE_SIZE)
+    n_window_y = math.ceil(raster_y_size / CORE_SIZE)
 
     for window_i in range(n_window_x):
-        i_core = window_i * MAX_WINDOW_SIZE
+        i_core = window_i * CORE_SIZE
         i_offset = i_core - max_travel_distance_in_pixels
-        i_size = MAX_WINDOW_SIZE + 2*max_travel_distance_in_pixels
+        i_size = CORE_SIZE + 2*max_travel_distance_in_pixels
         if i_offset < 0:
             # shrink the size by the left margin and clamp to 0
             i_size += i_offset
@@ -309,10 +308,10 @@ def people_access(
             i_size -= i_offset+i_size - raster_x_size
 
         for window_j in range(n_window_y):
-            j_core = window_j * MAX_WINDOW_SIZE
+            j_core = window_j * CORE_SIZE
             j_offset = (
                 j_core - max_travel_distance_in_pixels)
-            j_size = MAX_WINDOW_SIZE + 2*max_travel_distance_in_pixels
+            j_size = CORE_SIZE + 2*max_travel_distance_in_pixels
             if j_offset < 0:
                 # shrink the size by the left margin and clamp to 0
                 j_size += j_offset
@@ -344,10 +343,14 @@ def people_access(
             # # the nodata value is undefined but will present as 0.
             friction_array[numpy.isclose(friction_array, 0)] = numpy.nan
 
+            # doing i_core-i_offset and j_core-j_offset because those
+            # do the offsets of the relative size of the array, not the
+            # global extents
             population_reach = shortest_distances.find_population_reach(
                 friction_array, population_array, friction_array.shape,
-                cell_length, i_core,
-                j_core, max_travel_distance_in_pixels,
+                cell_length,
+                i_core-i_offset, j_core-j_offset,
+                max_travel_distance_in_pixels,
                 max_travel_distance_in_pixels,
                 MAX_TRAVEL_TIME,
                 MAX_TRAVEL_DISTANCE)

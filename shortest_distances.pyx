@@ -36,10 +36,10 @@ def find_population_reach(
         array_shape (tuple): an (j, i) size of the shape of the incoming
             arrays.
         cell_length (double): length of cell in meters.
-        core_x/core_y (int): defines the ul corner of the core in friction
-            array
+        core_i/core_j (int): defines the ul corner of the core in
+            arrays.
         core_size_i/j (int): defines the w/h of the core slice in
-            friction_array.
+            arrays.
         max_time (double): the time allowed when computing population reach.
         max_travel_distance (double): the maximum distance allowed to travel
              in meters.
@@ -49,6 +49,10 @@ def find_population_reach(
         friction array.
 
     """
+    LOGGER.debug(
+        f'core_i/j: {core_i},{core_j}\n'
+        f'i/j_offset: {i_offset},{j_offset}\n'
+        f'raster_x/y_size: {raster_x_size},{raster_y_size}')
     start_time = time.time()
     cdef double diagonal_cell_length = 2**0.5 * cell_length
     cdef int i, j
