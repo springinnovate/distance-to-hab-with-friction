@@ -53,6 +53,11 @@ def find_population_reach(
     cdef int i, j
     cdef numpy.ndarray[double, ndim=2] pop_coverage = numpy.zeros((nj, ni))
 
+    LOGGER.debug(
+        f'core_i, core_j: {core_i},{core_j}\n'
+        f'core_size_i, core_size_j: {core_size_i},{core_size_j}\n'
+        f'ni, nj: {ni},{nj}')
+
     for i in range(core_i, core_i+core_size_i):
         for j in range(core_j, core_j+core_size_j):
             population_val = population_array[j, i]
