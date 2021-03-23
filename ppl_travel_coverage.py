@@ -331,9 +331,10 @@ def people_access(
 
             LOGGER.debug(
                 f'window_i/j: {window_i},{window_j}\n'
-                f'n_window_x/y: {n_window_x},{n_window_y}\n'
-                f'i/j_size: {i_size},{j_size}\n'
                 f'i/j_offset: {i_offset},{j_offset}\n'
+                f'i/j_core: {i_core},{j_core}\n'
+                f'i/j_core_size: {i_core_size},{j_core_size}\n'
+                f'i/j_size: {i_size},{j_size}\n'
                 f'raster_x/y_size: {raster_x_size},{raster_y_size}')
 
             friction_array = friction_band.ReadAsArray(
@@ -487,4 +488,5 @@ def length_of_degree(lat):
 
 if __name__ == '__main__':
     main()
+
 
