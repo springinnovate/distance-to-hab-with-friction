@@ -10,6 +10,8 @@ import scipy.sparse.csgraph
 import numpy
 
 cimport numpy
+from libc.time cimport time as ctime
+from libc.time cimport time_t
 
 logging.basicConfig(
     level=logging.DEBUG,
