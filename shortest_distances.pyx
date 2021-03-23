@@ -23,7 +23,7 @@ LOGGER = logging.getLogger(__name__)
 def find_population_reach(
         numpy.ndarray[float, ndim=2] friction_array,
         numpy.ndarray[int, ndim=2] population_array,
-        double cell_length, int core_i, int core_j,
+        double cell_length_m, int core_i, int core_j,
         int core_size_i, int core_size_j,
         int n_cols, int n_rows,
         double max_time):
@@ -34,7 +34,7 @@ def find_population_reach(
             determining lcp in units minutes/pixel.
         population_array (numpy.ndarray): array with population values per
             pixel.
-        cell_length (double): length of cell in meters.
+        cell_length_m (double): length of cell in meters.
         core_i/core_j (int): defines the ul corner of the core in
             arrays.
         core_size_i/j (int): defines the w/h of the core slice in
@@ -49,11 +49,10 @@ def find_population_reach(
 
     """
     start_time = time.time()
-    cdef double diagonal_cell_length = 2**0.5 * cell_length
     cdef int i, j
     cdef numpy.ndarray[double, ndim=2] pop_coverage = numpy.zeros(
         (n_rows, n_cols))
-    cdef numpy.ndarray[bool, ndim=2] visited
+    cdef numpy.ndarray[numpy.npy_bool, ndim=2] visited
 
     LOGGER.debug(
         f'core_i, core_j: {core_i},{core_j}\n'
@@ -63,7 +62,17 @@ def find_population_reach(
     cdef list time_heap = []
     cdef int *ioff = [1, 1, 0, -1, -1, -1, 0, 1]
     cdef int *joff = [0, 1, 1, 1, 0, -1, -1, -1]
-    cdef float *dist_edge = [1, 2**0.5, 1, 2**0.5, 1, 2**0.5, 1, 2**0.5]
+    cdef float *dist_edge = [
+        cell_length_m,
+        cell_length_m*2**0.5,
+        cell_length_m,
+        cell_length_m*2**0.5,
+        cell_length_m,
+        cell_length_m*2**0.5,
+        cell_length_m,
+        cell_length_m*2**0.5]
+    cdef float frict_n, c_time, n_time,
+    cdef int i_start, j_start, i_n, j_n
 
     for i_start in range(core_i, core_i+core_size_i):
         for j_start in range(core_j, core_j+core_size_j):
@@ -73,8 +82,9 @@ def find_population_reach(
             visited = numpy.zeros((n_rows, n_cols), dtype=bool)
             time_heap = [(0, (j_start, i_start))]
 
+            # c_ -- current, n_ -- neighbor
             while time_heap:
-                time, (j, i) = heapq.heappop(time_heap)
+                c_time, (j, i) = heapq.heappop(time_heap)
                 visited[j, i] = True
                 for v in range(8):
                     i_n = i+ioff[v]
@@ -88,8 +98,10 @@ def find_population_reach(
                     frict_n = friction_array[j_n, i_n]
                     if frict_n <= 0:
                         continue
-                    n_time = time + frict_n*dist_edge[v]
+                    n_time = c_time + frict_n*dist_edge[v]
                     if n_time <= max_time:
                         heapq.heappush(time_heap, (n_time, (j_n, i_n)))
             pop_coverage += population_val * visited
+    LOGGER.debug(
+        f'completed ({core_i}, {core_j}) in {time.time()-start_time}s')
     return pop_coverage
