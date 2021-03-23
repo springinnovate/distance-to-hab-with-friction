@@ -72,7 +72,8 @@ def find_population_reach(
         cell_length_m,
         cell_length_m*2**0.5]
     cdef float frict_n, c_time, n_time,
-    cdef int i_start, j_start, i_n, j_n
+    cdef int i_start, j_start, i_n, j_n, n_steps
+    cdef time_t last_log_time
 
     for i_start in range(core_i, core_i+core_size_i):
         for j_start in range(core_j, core_j+core_size_j):
@@ -83,9 +84,17 @@ def find_population_reach(
             time_heap = [(0, (j_start, i_start))]
 
             # c_ -- current, n_ -- neighbor
+            last_log_time = ctime(NULL)
+            n_steps = 0
             while time_heap:
                 c_time, (j, i) = heapq.heappop(time_heap)
                 visited[j, i] = True
+                n_steps += 1
+                if ctime(NULL) - last_log_time > 5.0:
+                    last_log_time = ctime(NULL)
+                    LOGGER.info(
+                        f'Processing {j_start}, {i_start} for {n_steps}')
+
                 for v in range(8):
                     i_n = i+ioff[v]
                     j_n = j+joff[v]
