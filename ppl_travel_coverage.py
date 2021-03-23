@@ -347,11 +347,13 @@ def people_access(
             # do the offsets of the relative size of the array, not the
             # global extents
             population_reach = shortest_distances.find_population_reach(
-                friction_array, population_array, friction_array.shape,
+                friction_array, population_array,
                 cell_length,
                 i_core-i_offset, j_core-j_offset,
                 max_travel_distance_in_pixels,
                 max_travel_distance_in_pixels,
+                friction_array.shape[1],
+                friction_array.shape[0],
                 MAX_TRAVEL_TIME,
                 MAX_TRAVEL_DISTANCE)
             LOGGER.debug('population reach size: %s', population_reach.shape)
@@ -476,3 +478,4 @@ def length_of_degree(lat):
 
 if __name__ == '__main__':
     main()
+

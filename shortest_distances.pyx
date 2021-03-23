@@ -22,9 +22,9 @@ LOGGER = logging.getLogger(__name__)
 def find_population_reach(
         numpy.ndarray[float, ndim=2] friction_array,
         numpy.ndarray[int, ndim=2] population_array,
-        array_shape,
         double cell_length, int core_i, int core_j,
         int core_size_i, int core_size_j,
+        int ni, int nj,
         double max_time, double max_travel_distance):
     """Define later
 
@@ -40,6 +40,7 @@ def find_population_reach(
             arrays.
         core_size_i/j (int): defines the w/h of the core slice in
             arrays.
+        ni/nj (int): number of cells in i/j direction of given arrays.
         max_time (double): the time allowed when computing population reach.
         max_travel_distance (double): the maximum distance allowed to travel
              in meters.
