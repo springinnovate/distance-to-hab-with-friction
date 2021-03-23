@@ -49,10 +49,6 @@ def find_population_reach(
         friction array.
 
     """
-    LOGGER.debug(
-        f'core_i/j: {core_i},{core_j}\n'
-        f'i/j_offset: {i_offset},{j_offset}\n'
-        f'raster_x/y_size: {raster_x_size},{raster_y_size}')
     start_time = time.time()
     cdef double diagonal_cell_length = 2**0.5 * cell_length
     cdef int i, j
