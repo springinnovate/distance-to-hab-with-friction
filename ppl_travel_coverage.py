@@ -339,6 +339,7 @@ def people_access(
             population_array = population_band.ReadAsArray(
                 xoff=i_offset, yoff=j_offset,
                 win_xsize=i_size, win_ysize=j_size)
+            LOGGER.debug(f'population_array.size {population_array.size}')
             pop_nodata_mask = numpy.isclose(
                 population_array, population_nodata)
             total_population = numpy.sum(population_array[~pop_nodata_mask])
