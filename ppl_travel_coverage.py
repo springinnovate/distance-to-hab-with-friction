@@ -298,12 +298,16 @@ def people_access(
         i_core = window_i * CORE_SIZE
         i_offset = i_core - max_travel_distance_in_pixels
         i_size = CORE_SIZE + 2*max_travel_distance_in_pixels
+        i_core_size = CORE_SIZE
         if i_offset < 0:
             # shrink the size by the left margin and clamp to 0
             i_size += i_offset
             i_offset = 0
+
+        if i_core+i_core_size >= raster_x_size:
+            i_core_size -= i_core+i_core_size - raster_x_size
         if i_core+i_size >= raster_x_size:
-            i_core -= i_core+i_size - raster_x_size
+            i_size -= i_core+i_size - raster_x_size
         if i_offset+i_size >= raster_x_size:
             i_size -= i_offset+i_size - raster_x_size
 
@@ -312,10 +316,16 @@ def people_access(
             j_offset = (
                 j_core - max_travel_distance_in_pixels)
             j_size = CORE_SIZE + 2*max_travel_distance_in_pixels
+            j_core_size = CORE_SIZE
             if j_offset < 0:
                 # shrink the size by the left margin and clamp to 0
                 j_size += j_offset
                 j_offset = 0
+
+            if j_core+j_core_size >= raster_y_size:
+                j_core_size -= j_core+j_core_size - raster_y_size
+            if j_core+j_size >= raster_y_size:
+                j_size -= j_core+i_size - raster_y_size
             if j_offset+j_size >= raster_y_size:
                 j_size -= j_offset+j_size - raster_y_size
 
@@ -350,8 +360,7 @@ def people_access(
                 friction_array, population_array,
                 cell_length,
                 i_core-i_offset, j_core-j_offset,
-                max_travel_distance_in_pixels,
-                max_travel_distance_in_pixels,
+                i_core_size, j_core_size,
                 friction_array.shape[1],
                 friction_array.shape[0],
                 MAX_TRAVEL_TIME,
