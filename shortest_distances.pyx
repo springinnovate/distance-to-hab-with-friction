@@ -88,6 +88,7 @@ def find_population_reach(
             # c_ -- current, n_ -- neighbor
             last_log_time = ctime(NULL)
             n_steps = 0
+            LOGGER.info(f'Processing {j_start}, {i_start} for {n_steps}')
             while time_heap:
                 c_time, (j, i) = heapq.heappop(time_heap)
                 visited[j, i] = True
