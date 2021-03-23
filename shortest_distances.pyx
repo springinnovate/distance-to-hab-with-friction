@@ -1,4 +1,5 @@
 # cython: language_level=3
+# distutils: language=c++
 import time
 import logging
 import sys
