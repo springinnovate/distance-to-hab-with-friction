@@ -165,7 +165,7 @@ def main():
                 sorted(area_fid_list, reverse=True)):
         # put the index on there so we can see which one is done first
         if args.country_name is not None and (
-                country_name.lower() is not in allowed_country_set):
+                country_name.lower() not in allowed_country_set):
             continue
         country_workspace = os.path.join(
             COUNTRY_WORKSPACE_DIR, f'{country_index}_{country_name}')
