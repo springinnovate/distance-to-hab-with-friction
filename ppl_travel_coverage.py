@@ -603,6 +603,9 @@ def access_raster_worker(
     normalized_people_access_raster = None
     people_access_band = None
     normalized_people_access_band = None
+    LOGGER.info(
+        f'done writing to {target_people_access_path} and '
+        f'{target_normalized_people_access_path}')
 
 
 if __name__ == '__main__':
