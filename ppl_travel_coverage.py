@@ -260,6 +260,36 @@ def main():
     task_graph.join()
 
 
+def status_monitor(
+        start_complete_queue, status_id):
+    """Monitor how many steps have been completed and report logging.
+
+    Args:
+        start_compelte_queue (queue): first payload is number of updates
+            to expect. Subsequent payloads indicate a completed step.
+            When totally complete this worker exits.
+
+
+    Return:
+        ``None``
+    """
+    n_steps = start_complete_queue.get()
+    steps_complete = 0
+    while True:
+        time.sleep(10)
+        while True:
+            try:
+                _ = start_complete_queue.get_nowait()
+                steps_complete += 1
+            except queue.Empty:
+                break
+        LOGGER.info(
+            f'{status_id} is {steps_complete/n_steps*100:.2f}% complete')
+        if steps_complete == n_steps:
+            LOGGER.info(f'{status_id} 100% complete')
+        return
+
+
 def people_access(
         country_id, friction_raster_path, population_raster_path,
         habitat_raster_path,
@@ -285,7 +315,7 @@ def people_access(
         target_people_access_path (str): raster created that
             will contain the count of population that can reach any given
             pixel within the travel time and travel distance constraints.
-        target_normalized_people_access_path  (str): raster created
+        target_normalized_people_access_path (str): raster created
             that contains a normalized count of population that can
             reach any pixel within the travel time. Population is normalized
             by dividing the source population by the number of pixels that
@@ -309,6 +339,12 @@ def people_access(
         friction_raster_path)
     raster_x_size, raster_y_size = friction_raster_info['raster_size']
 
+    start_complete_queue = queue.Queue()
+    status_monitor_thread = threading.Thread(
+        target=status_monitor,
+        args=(start_complete_queue, country_id))
+    status_monitor_thread.start()
+
     shortest_distances_worker_thread_list = []
     work_queue = queue.Queue()
     result_queue = queue.Queue()
@@ -316,7 +352,8 @@ def people_access(
         shortest_distances_worker_thread = threading.Thread(
             target=shortest_distances_worker,
             args=(
-                work_queue, result_queue, friction_raster_path,
+                work_queue, result_queue, start_complete_queue,
+                friction_raster_path,
                 population_raster_path))
         shortest_distances_worker_thread.start()
         shortest_distances_worker_thread_list.append(
@@ -325,14 +362,14 @@ def people_access(
     access_raster_worker_thread = threading.Thread(
         target=access_raster_worker,
         args=(
-            result_queue, target_people_access_path,
+            result_queue, start_complete_queue, target_people_access_path,
             target_normalized_people_access_path))
     access_raster_worker_thread.start()
 
     n_window_x = math.ceil(raster_x_size / CORE_SIZE)
     n_window_y = math.ceil(raster_y_size / CORE_SIZE)
     n_windows = n_window_x * n_window_y
-    last_report = time.time()
+    start_complete_queue.put(n_windows)
     for window_i in range(n_window_x):
         i_core = window_i * CORE_SIZE
         i_offset = i_core - max_travel_distance_in_pixels
@@ -363,16 +400,6 @@ def people_access(
                 j_core_size -= j_core+j_core_size - raster_y_size + 1
             if j_offset+j_size >= raster_y_size:
                 j_size -= j_offset+j_size - raster_y_size + 1
-
-            work_queue.put(
-                (i_offset, j_offset, i_size, j_size, i_core, j_core,
-                 i_core_size, j_core_size))
-
-            if time.time() - last_report > 10.0:
-                last_report = time.time()
-                LOGGER.debug(
-                    f'processing {country_id}\n'
-                    f'\t{(window_j+window_i*n_window_y)/n_windows*100:.2f}% complete\n')
 
             work_queue.put(
                 (i_offset, j_offset, i_size, j_size, i_core, j_core,
@@ -426,7 +453,7 @@ def people_access(
 
 
 def shortest_distances_worker(
-        work_queue, result_queue, friction_raster_path,
+        work_queue, result_queue, start_complete_queue, friction_raster_path,
         population_raster_path):
     """Process shortest distances worker.
 
@@ -436,6 +463,12 @@ def shortest_distances_worker(
             wil be put here as a tuple of
             (n_valid, i_offset, j_offset, people_access,
              normalized_people_access)
+        start_complete_queue (queue): put a 1 in here for each block complete
+        friction_raster_path (str): path to a raster whose units are
+            minutes/meter required to cross any given pixel. Values of 0 are
+            treated as impassible.
+        population_raster_path (str): path to a per-pixel population count
+            raster.
 
     Return:
         ``None``
@@ -453,6 +486,7 @@ def shortest_distances_worker(
 
     while True:
         payload = work_queue.get()
+        LOGGER.debug(f'shortest_distance_worker got {payload}')
         if payload is None:
             work_queue.put(None)
             break
@@ -469,6 +503,7 @@ def shortest_distances_worker(
         total_population = numpy.sum(population_array[~pop_nodata_mask])
         # don't route population where there isn't any
         if total_population < POPULATION_COUNT_CUTOFF:
+            start_complete_queue.put(1)
             continue
 
         population_array[pop_nodata_mask] = 0.0
@@ -489,13 +524,14 @@ def shortest_distances_worker(
                 MAX_TRAVEL_TIME))
         if n_visited == 0:
             # no need to write an empty array
+            start_complete_queue.put(1)
             continue
         result_queue.put(
             (i_offset, j_offset, population_reach, norm_population_reach))
 
 
 def access_raster_worker(
-        work_queue, target_people_access_path,
+        work_queue, start_complete_queue, target_people_access_path,
         target_normalized_people_access_path):
     """Write arrays from the work queue as they come in.
 
@@ -503,7 +539,8 @@ def access_raster_worker(
         work_queue (queue): expect either None to stop or tuples of
             (n_valid, i_offset, j_offset, people_access,
              normalized_people_access)
-         target_people_access_path (str): raster created that
+        start_complete_queue (queue): put a 1 in here for each block complete
+        target_people_access_path (str): raster created that
             will contain the count of population that can reach any given
             pixel within the travel time and travel distance constraints.
         target_normalized_people_access_path  (str): raster created
@@ -528,6 +565,7 @@ def access_raster_worker(
         normalized_people_access_raster.GetRasterBand(1))
     while True:
         payload = work_queue.get()
+        LOGGER.debug(f'access_raster_worker got {payload}')
         if payload is None:
             LOGGER.info(
                 f'all done with {target_people_access_path} and '
@@ -556,6 +594,7 @@ def access_raster_worker(
             norm_population_reach[valid_mask])
         normalized_people_access_band.WriteArray(
             current_norm_pop_reach, xoff=i_offset, yoff=j_offset)
+        start_complete_queue.put(1)
 
     people_access_raster = None
     normalized_people_access_raster = None
@@ -563,114 +602,5 @@ def access_raster_worker(
     normalized_people_access_band = None
 
 
-def find_shortest_distances(
-        raster_path_band, xoff, yoff, win_xsize, win_ysize):
-    """Find shortest distances in a subgrid of raster_path.
-
-    Parameters:
-        raster_path_band (tuple): raster path band index tuple.
-        xoff, yoff, xwin_size, ywin_size (int): rectangle that defines
-            upper left hand corner and size of a subgrid to extract from
-            ``raster_path_band``.
-        edge_buffer_elements (int): number of pixels to buffer around the
-            defined rectangle for searching distances.
-
-    Returns:
-        ?
-
-    """
-    raster = gdal.OpenEx(raster_path_band[0])
-    band = raster.GetRasterBand(raster_path_band[1])
-    print('opening %s' % str(raster_path_band))
-    array = band.ReadAsArray(
-        xoff=xoff, yoff=yoff, win_xsize=win_xsize, win_ysize=win_ysize)
-    print(win_ysize)
-    dist_matrix = scipy.sparse.csc_matrix(
-        (([1], ([0], [1]))), (array.size, array.size))
-    print('making distances')
-    start_time = time.time()
-    distances = scipy.sparse.csgraph.shortest_path(
-        dist_matrix, method='auto', directed=False)
-    print(distances)
-    print('total time: %s', time.time() - start_time)
-
-
-def extract_and_project_feature(
-        vector_path, feature_id, projection_wkt, target_vector_path,
-        target_complete_token_path):
-    """Make a local projection of a single feature in a vector.
-
-    Parameters:
-        vector_path (str): base vector in WGS84 coordinates.
-        feature_id (int): FID for the feature to extract.
-        projection_wkt (str): projection wkt code to project feature to.
-        target_gpkg_vector_path (str): path to new GPKG vector that will
-            contain only that feature.
-        target_complete_token_path (str): path to a file that is created if
-             the function successfully completes.
-
-    Returns:
-        None.
-
-    """
-    base_vector = gdal.OpenEx(vector_path, gdal.OF_VECTOR)
-    base_layer = base_vector.GetLayer()
-    feature = base_layer.GetFeature(feature_id)
-    geom = feature.GetGeometryRef()
-
-    epsg_srs = osr.SpatialReference()
-    epsg_srs.ImportFromWkt(projection_wkt)
-
-    base_srs = base_layer.GetSpatialRef()
-    base_to_utm = osr.CoordinateTransformation(base_srs, epsg_srs)
-
-    # clip out watershed to its own file
-    # create a new shapefile
-    if os.path.exists(target_vector_path):
-        os.remove(target_vector_path)
-    driver = ogr.GetDriverByName('GPKG')
-    target_vector = driver.CreateDataSource(
-        target_vector_path)
-    target_layer = target_vector.CreateLayer(
-        os.path.splitext(os.path.basename(target_vector_path))[0],
-        epsg_srs, ogr.wkbMultiPolygon)
-    layer_defn = target_layer.GetLayerDefn()
-    feature_geometry = geom.Clone()
-    base_feature = ogr.Feature(layer_defn)
-    feature_geometry.Transform(base_to_utm)
-    base_feature.SetGeometry(feature_geometry)
-    target_layer.CreateFeature(base_feature)
-    target_layer.SyncToDisk()
-    geom = None
-    feature_geometry = None
-    base_feature = None
-    target_layer = None
-    target_vector = None
-    base_layer = None
-    base_vector = None
-    with open(target_complete_token_path, 'w') as token_file:
-        token_file.write(str(datetime.datetime.now()))
-
-
-def length_of_degree(lat):
-    """Calculate the length of a degree in meters."""
-    m1 = 111132.92
-    m2 = -559.82
-    m3 = 1.175
-    m4 = -0.0023
-    p1 = 111412.84
-    p2 = -93.5
-    p3 = 0.118
-    lat_rad = lat * numpy.pi / 180
-    latlen = (
-        m1 + m2 * numpy.cos(2 * lat_rad) + m3 * numpy.cos(4 * lat_rad) +
-        m4 * numpy.cos(6 * lat_rad))
-    longlen = abs(
-        p1 * numpy.cos(lat_rad) + p2 * numpy.cos(3 * lat_rad) + p3 * numpy.cos(5 * lat_rad))
-    return max(latlen, longlen)
-
-
 if __name__ == '__main__':
     main()
-
-
