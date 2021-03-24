@@ -284,9 +284,8 @@ def status_monitor(
             LOGGER.info(
                 f'{status_id} is {steps_complete/n_steps*100:.2f}% complete')
             if steps_complete == n_steps:
-                break
                 LOGGER.info(f'done monitoring {status_id}')
-            return
+                return
     except Exception:
         LOGGER.exception(
             f'something bad happened on status_monitor {status_id}')
