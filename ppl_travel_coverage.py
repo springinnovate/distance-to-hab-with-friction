@@ -298,6 +298,17 @@ def people_access(
         None.
 
     """
+    pygeoprocessing.new_raster_from_base(
+        population_raster_path, target_people_access_path, gdal.GDT_Float32,
+        [-1])
+    pygeoprocessing.new_raster_from_base(
+        population_raster_path, target_normalized_people_access_path,
+        gdal.GDT_Float32, [-1])
+
+    friction_raster_info = pygeoprocessing.get_raster_info(
+        friction_raster_path)
+    raster_x_size, raster_y_size = friction_raster_info['raster_size']
+
     shortest_distances_worker_thread_list = []
     work_queue = queue.Queue()
     result_queue = queue.Queue()
@@ -317,35 +328,6 @@ def people_access(
             result_queue, target_people_access_path,
             target_normalized_people_access_path))
     access_raster_worker_thread.start()
-
-    pygeoprocessing.new_raster_from_base(
-        population_raster_path, target_people_access_path, gdal.GDT_Float32,
-        [-1])
-    people_access_raster = gdal.OpenEx(
-        target_people_access_path, gdal.OF_RASTER | gdal.GA_Update)
-    people_access_band = people_access_raster.GetRasterBand(1)
-
-    pygeoprocessing.new_raster_from_base(
-        population_raster_path, target_normalized_people_access_path,
-        gdal.GDT_Float32, [-1])
-    normalized_people_access_raster = gdal.OpenEx(
-        target_normalized_people_access_path,
-        gdal.OF_RASTER | gdal.GA_Update)
-    normalized_people_access_band = \
-        normalized_people_access_raster.GetRasterBand(1)
-
-    friction_raster_info = pygeoprocessing.get_raster_info(
-        friction_raster_path)
-    cell_length = friction_raster_info['pixel_size'][0]
-    raster_x_size, raster_y_size = friction_raster_info['raster_size']
-
-    friction_raster = gdal.OpenEx(
-        friction_raster_path, gdal.OF_RASTER)
-    friction_band = friction_raster.GetRasterBand(1)
-    population_raster = gdal.OpenEx(
-        population_raster_path, gdal.OF_RASTER)
-    population_band = population_raster.GetRasterBand(1)
-    population_nodata = population_band.GetNoDataValue()
 
     n_window_x = math.ceil(raster_x_size / CORE_SIZE)
     n_window_y = math.ceil(raster_y_size / CORE_SIZE)
@@ -391,19 +373,6 @@ def people_access(
                 LOGGER.debug(
                     f'processing {country_id}\n'
                     f'\t{(window_j+window_i*n_window_y)/n_windows*100:.2f}% complete\n')
-
-            friction_array = friction_band.ReadAsArray(
-                xoff=i_offset, yoff=j_offset,
-                win_xsize=i_size, win_ysize=j_size)
-            population_array = population_band.ReadAsArray(
-                xoff=i_offset, yoff=j_offset,
-                win_xsize=i_size, win_ysize=j_size)
-            pop_nodata_mask = numpy.isclose(
-                population_array, population_nodata)
-            total_population = numpy.sum(population_array[~pop_nodata_mask])
-            # don't route population where there isn't any
-            if total_population < POPULATION_COUNT_CUTOFF:
-                continue
 
             work_queue.put(
                 (i_offset, j_offset, i_size, j_size, i_core, j_core,
