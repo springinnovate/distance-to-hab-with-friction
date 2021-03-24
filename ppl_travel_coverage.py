@@ -269,23 +269,27 @@ def status_monitor(
     Return:
         ``None``
     """
-    n_steps = start_complete_queue.get()
-    LOGGER.info(f'status monitor expecting {n_steps} steps')
-    steps_complete = 0
-    while True:
-        time.sleep(5)
+    try:
+        n_steps = start_complete_queue.get()
+        LOGGER.info(f'status monitor expecting {n_steps} steps')
+        steps_complete = 0
         while True:
-            try:
-                _ = start_complete_queue.get_nowait()
-                steps_complete += 1
-            except queue.Empty:
+            time.sleep(5)
+            while True:
+                try:
+                    _ = start_complete_queue.get_nowait()
+                    steps_complete += 1
+                except queue.Empty:
+                    break
+            LOGGER.info(
+                f'{status_id} is {steps_complete/n_steps*100:.2f}% complete')
+            if steps_complete == n_steps:
                 break
-        LOGGER.info(
-            f'{status_id} is {steps_complete/n_steps*100:.2f}% complete')
-        if steps_complete == n_steps:
-            break
-            LOGGER.info(f'done monitoring {status_id}')
-        return
+                LOGGER.info(f'done monitoring {status_id}')
+            return
+    except Exception:
+        LOGGER.exception(
+            f'something bad happened on status_monitor {status_id}')
 
 
 def people_access(
