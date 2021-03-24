@@ -9,7 +9,7 @@ setup(
     ext_modules=[
         Extension(
             name="shortest_distances",
-            sources=["shortest_distances.pyx"],
+            sources=["src/shortest_distances.pyx"],
             include_dirs=[
                 numpy.get_include()],
             language="c++",
