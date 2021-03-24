@@ -45,8 +45,6 @@ TARGET_CELL_LENGTH_M = 1000
 # maximum window size to process one set of travel times over
 CORE_SIZE = 100
 
-TASKGRAPH_WORKERS = int(sys.argv[1])  # multiprocessing.cpu_count()
-
 logging.basicConfig(
     level=logging.DEBUG,
     format=(
