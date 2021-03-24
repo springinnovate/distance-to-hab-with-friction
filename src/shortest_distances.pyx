@@ -87,7 +87,6 @@ def find_population_reach(
          2D array of population reach of the same size as input arrays).
 
     """
-    start_time = time.time()
     cdef int i, j
     cdef numpy.ndarray[double, ndim=2] pop_coverage = numpy.zeros(
         (n_rows, n_cols))
@@ -106,24 +105,27 @@ def find_population_reach(
         cell_length_m*2**0.5,
         cell_length_m,
         cell_length_m*2**0.5]
-    cdef float frict_n, c_time, n_time,
+    cdef float frict_n, c_time, n_time, population_val
     cdef int i_start, j_start, i_n, j_n, n_steps
     cdef time_t last_log_time
 
     cdef DistPriorityQueueType dist_queue
     cdef ValuePixelType pixel
-    cdef int n_visited = 0
-    for i_start in range(core_i, core_i+core_size_i):
-        for j_start in range(core_j, core_j+core_size_j):
-            population_val = population_array[j_start, i_start]
-            if population_val <= 0:
-                continue
-            visited = numpy.zeros((n_rows, n_cols), dtype=bool)
-            pixel = ValuePixelType(0, i_start, j_start)
-            dist_queue.push(pixel)
-            n_visited += 1
+    cdef int n_visited = 0, any_visited = 0
+    visited = numpy.zeros((n_rows, n_cols), dtype=bool)
+    with nogil:
+        for i_start in range(core_i, core_i+core_size_i):
+            for j_start in range(core_j, core_j+core_size_j):
+                population_val = population_array[j_start, i_start]
+                if population_val <= 0:
+                    continue
+                pixel.value = 0
+                pixel.i = i_start
+                pixel.j = j_start
+                dist_queue.push(pixel)
+                n_visited = 1
+                any_visited = 1
 
-            with nogil:
                 # c_ -- current, n_ -- neighbor
                 last_log_time = ctime(NULL)
                 n_steps = 0
@@ -134,6 +136,8 @@ def find_population_reach(
                     i = pixel.i
                     j = pixel.j
                     visited[j, i] = True
+                    n_visited += 1
+                    pop_coverage[j, i] += population_val
                     n_steps += 1
                     if ctime(NULL) - last_log_time > 5.0:
                         last_log_time = ctime(NULL)
@@ -161,7 +165,8 @@ def find_population_reach(
                             pixel.i = i_n
                             pixel.j = j_n
                             dist_queue.push(pixel)
-            pop_coverage[visited] += population_val
-            norm_pop_coverage[visited] += (
-                population_val / numpy.count_nonzero(visited))
-    return n_visited, pop_coverage, norm_pop_coverage
+                with gil:
+                    norm_pop_coverage[visited] += (
+                        population_val / float(n_visited))
+                    visited[:] = 0
+    return any_visited, pop_coverage, norm_pop_coverage
