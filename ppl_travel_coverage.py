@@ -1,7 +1,7 @@
 """Distance to habitat with a friction layer."""
+import argparse
 import datetime
 import math
-import multiprocessing
 import time
 import os
 import logging
@@ -97,9 +97,15 @@ def get_min_nonzero_raster_value(raster_path):
 
 def main():
     """Entry point."""
+    parser = argparse.ArgumentParser(description='People Travel Coverage')
+    parser.add_argument(
+        '--countries', type=str, nargs='+',
+        help='comma separated list of countries to simulate')
+    args = parser.parse_args()
+
     for dir_path in [WORKSPACE_DIR, CHURN_DIR, ECOSHARD_DIR]:
         os.makedirs(dir_path, exist_ok=True)
-    task_graph = taskgraph.TaskGraph(CHURN_DIR, TASKGRAPH_WORKERS, 5.0)
+    task_graph = taskgraph.TaskGraph(CHURN_DIR, -1)
     ecoshard_path_map = {}
 
     for ecoshard_id, ecoshard_url in RASTER_ECOSHARD_URL_MAP.items():
@@ -150,10 +156,17 @@ def main():
 
     population_raster_info = pygeoprocessing.get_raster_info(
         ecoshard_path_map['population_2017'])
+    allowed_country_set = None
+    if args.country_name is not None:
+        allowed_country_set = set(
+            [name.lower() for name in args.country_name])
     for country_index, (
             country_area, utm_wkt, country_name, country_fid) in enumerate(
                 sorted(area_fid_list, reverse=True)):
         # put the index on there so we can see which one is done first
+        if args.country_name is not None and (
+                country_name.lower() is not in allowed_country_set):
+            continue
         country_workspace = os.path.join(
             COUNTRY_WORKSPACE_DIR, f'{country_index}_{country_name}')
         os.makedirs(country_workspace, exist_ok=True)
