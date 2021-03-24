@@ -80,13 +80,16 @@ def find_population_reach(
             in minutes.
 
     Returns:
-        core_size 2D array of population reach starting at core_x/y on the
-        friction array.
+        tuple:
+        (n_visited,
+         2D array of population reach of the same size as input arrays).
 
     """
     start_time = time.time()
     cdef int i, j
     cdef numpy.ndarray[double, ndim=2] pop_coverage = numpy.zeros(
+        (n_rows, n_cols))
+    cdef numpy.ndarray[double, ndim=2] norm_pop_coverage = numpy.zeros(
         (n_rows, n_cols))
     cdef numpy.ndarray[numpy.npy_bool, ndim=2] visited
 
@@ -107,7 +110,7 @@ def find_population_reach(
 
     cdef DistPriorityQueueType dist_queue
     cdef ValuePixelType pixel
-
+    cdef int n_visited
     for i_start in range(core_i, core_i+core_size_i):
         for j_start in range(core_j, core_j+core_size_j):
             population_val = population_array[j_start, i_start]
@@ -116,6 +119,7 @@ def find_population_reach(
             visited = numpy.zeros((n_rows, n_cols), dtype=bool)
             pixel = ValuePixelType(0, i_start, j_start)
             dist_queue.push(pixel)
+            n_visited += 1
 
             # c_ -- current, n_ -- neighbor
             last_log_time = ctime(NULL)
@@ -150,5 +154,7 @@ def find_population_reach(
                         # heapq.heappush(time_heap, (n_time, (j_n, i_n)))
                         pixel = ValuePixelType(n_time, i_n, j_n)
                         dist_queue.push(pixel)
-            pop_coverage += population_val * visited
-    return pop_coverage
+            pop_coverage[visited] += population_val[visited]
+            norm_pop_coverage[visited] += (
+                population_val[visited] / numpy.count_nonzero(visited))
+    return n_visited, pop_coverage, norm_pop_coverage

@@ -257,7 +257,7 @@ def people_access(
         country_id, friction_raster_path, population_raster_path,
         habitat_raster_path,
         max_travel_time, max_travel_distance_in_pixels,
-        target_people_access_path):
+        target_people_access_path, target_normalized_people_access_path):
     """Construct a people access raster showing where people can reach.
 
     The people access raster will have a value of population count per pixel
@@ -275,9 +275,17 @@ def people_access(
             allow when determining where population can travel to.
         max_travel_distance_in_pixels (float): the maximum straight-line
             pixel distance to allow. Used to define working buffers.
-        target_people_access_path (str): raster created by this call that
+        target_people_access_path (str): raster created that
             will contain the count of population that can reach any given
             pixel within the travel time and travel distance constraints.
+        target_normalized_people_access_path  (str): raster created
+            that contains a normalized count of population that can
+            reach any pixel within the travel time. Population is normalized
+            by dividing the source population by the number of pixels that
+            it can reach such that the sum of the entire reachable area
+            equals the original population count. Useful for aggregating of
+            "number of people that can reach this area" and similar
+            calculations.
 
     Returns:
         None.
@@ -285,10 +293,19 @@ def people_access(
     """
     pygeoprocessing.new_raster_from_base(
         population_raster_path, target_people_access_path, gdal.GDT_Float32,
-        [-1], fill_value_list=[-1])
+        [-1])
     people_access_raster = gdal.OpenEx(
         target_people_access_path, gdal.OF_RASTER | gdal.GA_Update)
     people_access_band = people_access_raster.GetRasterBand(1)
+
+    pygeoprocessing.new_raster_from_base(
+        population_raster_path, target_normalized_people_access_path,
+        gdal.GDT_Float32, [-1])
+    normalized_people_access_raster = gdal.OpenEx(
+        target_normalized_people_access_path,
+        gdal.OF_RASTER | gdal.GA_Update)
+    normalized_people_access_band = \
+        normalized_people_access_raster.GetRasterBand(1)
 
     friction_raster_info = pygeoprocessing.get_raster_info(
         friction_raster_path)
@@ -364,7 +381,7 @@ def people_access(
             # doing i_core-i_offset and j_core-j_offset because those
             # do the offsets of the relative size of the array, not the
             # global extents
-            population_reach = shortest_distances.find_population_reach(
+            n_visited, population_reach, norm_population_reach = shortest_distances.find_population_reach(
                 friction_array, population_array,
                 cell_length,
                 i_core-i_offset, j_core-j_offset,
@@ -372,6 +389,9 @@ def people_access(
                 friction_array.shape[1],
                 friction_array.shape[0],
                 MAX_TRAVEL_TIME)
+            if n_visited == 0:
+                # no need to write an empty array
+                continue
             current_pop_reach = people_access_band.ReadAsArray(
                 xoff=i_offset, yoff=j_offset,
                 win_xsize=i_size, win_ysize=j_size)
@@ -380,6 +400,18 @@ def people_access(
             current_pop_reach[valid_mask] += population_reach[valid_mask]
             people_access_band.WriteArray(
                 current_pop_reach, xoff=i_offset, yoff=j_offset)
+
+            current_norm_pop_reach = (
+                normalized_people_access_band.ReadAsArray(
+                    xoff=i_offset, yoff=j_offset,
+                    win_xsize=i_size, win_ysize=j_size))
+            valid_mask = norm_population_reach > 0
+            current_norm_pop_reach[
+                (current_norm_pop_reach == -1) & valid_mask] = 0
+            current_norm_pop_reach[valid_mask] += (
+                norm_population_reach[valid_mask])
+            people_access_band.WriteArray(
+                current_norm_pop_reach, xoff=i_offset, yoff=j_offset)
 
     LOGGER.info(f'done with {target_people_access_path}')
 
