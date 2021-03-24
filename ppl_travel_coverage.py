@@ -1,11 +1,14 @@
 """Distance to habitat with a friction layer."""
 import argparse
 import datetime
-import math
-import time
-import os
 import logging
+import math
+import multiprocessing
+import os
+import queue
 import sys
+import threading
+import time
 
 import pygeoprocessing
 import numpy
@@ -295,6 +298,26 @@ def people_access(
         None.
 
     """
+    shortest_distances_worker_thread_list = []
+    work_queue = queue.Queue()
+    result_queue = queue.Queue()
+    for _ in range(multiprocessing.cpu_count()):
+        shortest_distances_worker_thread = threading.Thread(
+            target=shortest_distances_worker,
+            args=(
+                work_queue, result_queue, friction_raster_path,
+                population_raster_path))
+        shortest_distances_worker_thread.start()
+        shortest_distances_worker_thread_list.append(
+            shortest_distances_worker_thread)
+
+    access_raster_worker_thread = threading.Thread(
+        target=access_raster_worker,
+        args=(
+            result_queue, target_people_access_path,
+            target_normalized_people_access_path))
+    access_raster_worker_thread.start()
+
     pygeoprocessing.new_raster_from_base(
         population_raster_path, target_people_access_path, gdal.GDT_Float32,
         [-1])
@@ -359,6 +382,10 @@ def people_access(
             if j_offset+j_size >= raster_y_size:
                 j_size -= j_offset+j_size - raster_y_size + 1
 
+            work_queue.put(
+                (i_offset, j_offset, i_size, j_size, i_core, j_core,
+                 i_core_size, j_core_size))
+
             if time.time() - last_report > 10.0:
                 last_report = time.time()
                 LOGGER.debug(
@@ -378,46 +405,193 @@ def people_access(
             if total_population < POPULATION_COUNT_CUTOFF:
                 continue
 
-            population_array[pop_nodata_mask] = 0.0
-            # # the nodata value is undefined but will present as 0.
-            friction_array[numpy.isclose(friction_array, 0)] = numpy.nan
+            work_queue.put(
+                (i_offset, j_offset, i_size, j_size, i_core, j_core,
+                 i_core_size, j_core_size))
 
-            # doing i_core-i_offset and j_core-j_offset because those
-            # do the offsets of the relative size of the array, not the
-            # global extents
-            n_visited, population_reach, norm_population_reach = shortest_distances.find_population_reach(
+    work_queue.put(None)
+    for worker_thread in shortest_distances_worker_thread_list:
+        worker_thread.join()
+    result_queue.put(None)
+    access_raster_worker_thread.join()
+    # population_array[pop_nodata_mask] = 0.0
+    # # # the nodata value is undefined but will present as 0.
+    # friction_array[numpy.isclose(friction_array, 0)] = numpy.nan
+
+    # # doing i_core-i_offset and j_core-j_offset because those
+    # # do the offsets of the relative size of the array, not the
+    # # global extents
+    # n_visited, population_reach, norm_population_reach = shortest_distances.find_population_reach(
+    #     friction_array, population_array,
+    #     cell_length,
+    #     i_core-i_offset, j_core-j_offset,
+    #     i_core_size, j_core_size,
+    #     friction_array.shape[1],
+    #     friction_array.shape[0],
+    #     MAX_TRAVEL_TIME)
+    # if n_visited == 0:
+    #     # no need to write an empty array
+    #     continue
+    # current_pop_reach = people_access_band.ReadAsArray(
+    #     xoff=i_offset, yoff=j_offset,
+    #     win_xsize=i_size, win_ysize=j_size)
+    # valid_mask = population_reach > 0
+    # current_pop_reach[(current_pop_reach == -1) & valid_mask] = 0
+    # current_pop_reach[valid_mask] += population_reach[valid_mask]
+    # people_access_band.WriteArray(
+    #     current_pop_reach, xoff=i_offset, yoff=j_offset)
+
+    # current_norm_pop_reach = (
+    #     normalized_people_access_band.ReadAsArray(
+    #         xoff=i_offset, yoff=j_offset,
+    #         win_xsize=i_size, win_ysize=j_size))
+    # valid_mask = norm_population_reach > 0
+    # current_norm_pop_reach[
+    #     (current_norm_pop_reach == -1) & valid_mask] = 0
+    # current_norm_pop_reach[valid_mask] += (
+    #     norm_population_reach[valid_mask])
+    # normalized_people_access_band.WriteArray(
+    #     current_norm_pop_reach, xoff=i_offset, yoff=j_offset)
+
+    LOGGER.info(f'done with {target_people_access_path}')
+
+
+def shortest_distances_worker(
+        work_queue, result_queue, friction_raster_path,
+        population_raster_path):
+    """Process shortest distances worker.
+
+    Args:
+        work_queue (queue):
+        result_queue (queue): the result of a given shortest distance call
+            wil be put here as a tuple of
+            (n_valid, i_offset, j_offset, people_access,
+             normalized_people_access)
+
+    Return:
+        ``None``
+    """
+    friction_raster = gdal.OpenEx(friction_raster_path, gdal.OF_RASTER)
+    friction_band = friction_raster.GetRasterBand(1)
+    population_raster = gdal.OpenEx(population_raster_path, gdal.OF_RASTER)
+    population_band = population_raster.GetRasterBand(1)
+    population_nodata = population_band.GetNoDataValue()
+
+    friction_raster_info = pygeoprocessing.get_raster_info(
+        friction_raster_path)
+    cell_length = friction_raster_info['pixel_size'][0]
+    raster_x_size, raster_y_size = friction_raster_info['raster_size']
+
+    while True:
+        payload = work_queue.get()
+        if payload is None:
+            work_queue.put(None)
+            break
+        (i_offset, j_offset, i_size, j_size, i_core, j_core,
+         i_core_size, j_core_size) = payload
+        friction_array = friction_band.ReadAsArray(
+            xoff=i_offset, yoff=j_offset,
+            win_xsize=i_size, win_ysize=j_size)
+        population_array = population_band.ReadAsArray(
+            xoff=i_offset, yoff=j_offset,
+            win_xsize=i_size, win_ysize=j_size)
+        pop_nodata_mask = numpy.isclose(
+            population_array, population_nodata)
+        total_population = numpy.sum(population_array[~pop_nodata_mask])
+        # don't route population where there isn't any
+        if total_population < POPULATION_COUNT_CUTOFF:
+            continue
+
+        population_array[pop_nodata_mask] = 0.0
+        # # the nodata value is undefined but will present as 0.
+        friction_array[numpy.isclose(friction_array, 0)] = numpy.nan
+
+        # doing i_core-i_offset and j_core-j_offset because those
+        # do the offsets of the relative size of the array, not the
+        # global extents
+        n_visited, population_reach, norm_population_reach = (
+            shortest_distances.find_population_reach(
                 friction_array, population_array,
                 cell_length,
                 i_core-i_offset, j_core-j_offset,
                 i_core_size, j_core_size,
                 friction_array.shape[1],
                 friction_array.shape[0],
-                MAX_TRAVEL_TIME)
-            if n_visited == 0:
-                # no need to write an empty array
-                continue
-            current_pop_reach = people_access_band.ReadAsArray(
+                MAX_TRAVEL_TIME))
+        if n_visited == 0:
+            # no need to write an empty array
+            continue
+        result_queue.put(
+            (i_offset, j_offset, population_reach, norm_population_reach))
+
+
+def access_raster_worker(
+        work_queue, target_people_access_path,
+        target_normalized_people_access_path):
+    """Write arrays from the work queue as they come in.
+
+    Args:
+        work_queue (queue): expect either None to stop or tuples of
+            (n_valid, i_offset, j_offset, people_access,
+             normalized_people_access)
+         target_people_access_path (str): raster created that
+            will contain the count of population that can reach any given
+            pixel within the travel time and travel distance constraints.
+        target_normalized_people_access_path  (str): raster created
+            that contains a normalized count of population that can
+            reach any pixel within the travel time. Population is normalized
+            by dividing the source population by the number of pixels that
+            it can reach such that the sum of the entire reachable area
+            equals the original population count. Useful for aggregating of
+            "number of people that can reach this area" and similar
+            calculations.
+
+    Return:
+        ``None``
+    """
+    people_access_raster = gdal.OpenEx(
+        target_people_access_path, gdal.OF_RASTER | gdal.GA_Update)
+    people_access_band = people_access_raster.GetRasterBand(1)
+    normalized_people_access_raster = gdal.OpenEx(
+        target_normalized_people_access_path,
+        gdal.OF_RASTER | gdal.GA_Update)
+    normalized_people_access_band = (
+        normalized_people_access_raster.GetRasterBand(1))
+    while True:
+        payload = work_queue.get()
+        if payload is None:
+            LOGGER.info(
+                f'all done with {target_people_access_path} and '
+                f'{target_normalized_people_access_path}')
+            break
+
+        (i_offset, j_offset, population_reach, norm_population_reach) = payload
+        j_size, i_size = population_reach.shape
+        current_pop_reach = people_access_band.ReadAsArray(
+            xoff=i_offset, yoff=j_offset,
+            win_xsize=i_size, win_ysize=j_size)
+        valid_mask = population_reach > 0
+        current_pop_reach[(current_pop_reach == -1) & valid_mask] = 0
+        current_pop_reach[valid_mask] += population_reach[valid_mask]
+        people_access_band.WriteArray(
+            current_pop_reach, xoff=i_offset, yoff=j_offset)
+
+        current_norm_pop_reach = (
+            normalized_people_access_band.ReadAsArray(
                 xoff=i_offset, yoff=j_offset,
-                win_xsize=i_size, win_ysize=j_size)
-            valid_mask = population_reach > 0
-            current_pop_reach[(current_pop_reach == -1) & valid_mask] = 0
-            current_pop_reach[valid_mask] += population_reach[valid_mask]
-            people_access_band.WriteArray(
-                current_pop_reach, xoff=i_offset, yoff=j_offset)
+                win_xsize=i_size, win_ysize=j_size))
+        valid_mask = norm_population_reach > 0
+        current_norm_pop_reach[
+            (current_norm_pop_reach == -1) & valid_mask] = 0
+        current_norm_pop_reach[valid_mask] += (
+            norm_population_reach[valid_mask])
+        normalized_people_access_band.WriteArray(
+            current_norm_pop_reach, xoff=i_offset, yoff=j_offset)
 
-            current_norm_pop_reach = (
-                normalized_people_access_band.ReadAsArray(
-                    xoff=i_offset, yoff=j_offset,
-                    win_xsize=i_size, win_ysize=j_size))
-            valid_mask = norm_population_reach > 0
-            current_norm_pop_reach[
-                (current_norm_pop_reach == -1) & valid_mask] = 0
-            current_norm_pop_reach[valid_mask] += (
-                norm_population_reach[valid_mask])
-            normalized_people_access_band.WriteArray(
-                current_norm_pop_reach, xoff=i_offset, yoff=j_offset)
-
-    LOGGER.info(f'done with {target_people_access_path}')
+    people_access_raster = None
+    normalized_people_access_raster = None
+    people_access_band = None
+    normalized_people_access_band = None
 
 
 def find_shortest_distances(
