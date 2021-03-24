@@ -413,8 +413,10 @@ def people_access(
     work_queue.put(None)
     for worker_thread in shortest_distances_worker_thread_list:
         worker_thread.join()
+    LOGGER.info(f'done with workers')
     result_queue.put(None)
     access_raster_worker_thread.join()
+    LOGGER.info(f'done with access raster worker')
     # population_array[pop_nodata_mask] = 0.0
     # # # the nodata value is undefined but will present as 0.
     # friction_array[numpy.isclose(friction_array, 0)] = numpy.nan
@@ -559,53 +561,57 @@ def access_raster_worker(
     Return:
         ``None``
     """
-    people_access_raster = gdal.OpenEx(
-        target_people_access_path, gdal.OF_RASTER | gdal.GA_Update)
-    people_access_band = people_access_raster.GetRasterBand(1)
-    normalized_people_access_raster = gdal.OpenEx(
-        target_normalized_people_access_path,
-        gdal.OF_RASTER | gdal.GA_Update)
-    normalized_people_access_band = (
-        normalized_people_access_raster.GetRasterBand(1))
-    while True:
-        payload = work_queue.get()
-        if payload is None:
-            LOGGER.info(
-                f'all done with {target_people_access_path} and '
-                f'{target_normalized_people_access_path}')
-            break
+    try:
+        people_access_raster = gdal.OpenEx(
+            target_people_access_path, gdal.OF_RASTER | gdal.GA_Update)
+        people_access_band = people_access_raster.GetRasterBand(1)
+        normalized_people_access_raster = gdal.OpenEx(
+            target_normalized_people_access_path,
+            gdal.OF_RASTER | gdal.GA_Update)
+        normalized_people_access_band = (
+            normalized_people_access_raster.GetRasterBand(1))
+        while True:
+            payload = work_queue.get()
+            if payload is None:
+                LOGGER.info(
+                    f'all done with {target_people_access_path} and '
+                    f'{target_normalized_people_access_path}')
+                break
 
-        (i_offset, j_offset, population_reach, norm_population_reach) = payload
-        j_size, i_size = population_reach.shape
-        current_pop_reach = people_access_band.ReadAsArray(
-            xoff=i_offset, yoff=j_offset,
-            win_xsize=i_size, win_ysize=j_size)
-        valid_mask = population_reach > 0
-        current_pop_reach[(current_pop_reach == -1) & valid_mask] = 0
-        current_pop_reach[valid_mask] += population_reach[valid_mask]
-        people_access_band.WriteArray(
-            current_pop_reach, xoff=i_offset, yoff=j_offset)
-
-        current_norm_pop_reach = (
-            normalized_people_access_band.ReadAsArray(
+            (i_offset, j_offset, population_reach, norm_population_reach) = payload
+            j_size, i_size = population_reach.shape
+            current_pop_reach = people_access_band.ReadAsArray(
                 xoff=i_offset, yoff=j_offset,
-                win_xsize=i_size, win_ysize=j_size))
-        valid_mask = norm_population_reach > 0
-        current_norm_pop_reach[
-            (current_norm_pop_reach == -1) & valid_mask] = 0
-        current_norm_pop_reach[valid_mask] += (
-            norm_population_reach[valid_mask])
-        normalized_people_access_band.WriteArray(
-            current_norm_pop_reach, xoff=i_offset, yoff=j_offset)
-        start_complete_queue.put(1)
+                win_xsize=i_size, win_ysize=j_size)
+            valid_mask = population_reach > 0
+            current_pop_reach[(current_pop_reach == -1) & valid_mask] = 0
+            current_pop_reach[valid_mask] += population_reach[valid_mask]
+            people_access_band.WriteArray(
+                current_pop_reach, xoff=i_offset, yoff=j_offset)
 
-    people_access_raster = None
-    normalized_people_access_raster = None
-    people_access_band = None
-    normalized_people_access_band = None
-    LOGGER.info(
-        f'done writing to {target_people_access_path} and '
-        f'{target_normalized_people_access_path}')
+            current_norm_pop_reach = (
+                normalized_people_access_band.ReadAsArray(
+                    xoff=i_offset, yoff=j_offset,
+                    win_xsize=i_size, win_ysize=j_size))
+            valid_mask = norm_population_reach > 0
+            current_norm_pop_reach[
+                (current_norm_pop_reach == -1) & valid_mask] = 0
+            current_norm_pop_reach[valid_mask] += (
+                norm_population_reach[valid_mask])
+            normalized_people_access_band.WriteArray(
+                current_norm_pop_reach, xoff=i_offset, yoff=j_offset)
+            start_complete_queue.put(1)
+
+        people_access_raster = None
+        normalized_people_access_raster = None
+        people_access_band = None
+        normalized_people_access_band = None
+        LOGGER.info(
+            f'done writing to {target_people_access_path} and '
+            f'{target_normalized_people_access_path}')
+    except Exception:
+        LOGGER.exception(f'something bad happened on access_raster_worker')
+        raise
 
 
 if __name__ == '__main__':
