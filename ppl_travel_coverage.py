@@ -304,7 +304,8 @@ def people_access(
 
     n_window_x = math.ceil(raster_x_size / CORE_SIZE)
     n_window_y = math.ceil(raster_y_size / CORE_SIZE)
-
+    n_windows = n_window_x * n_window_y
+    last_report = time.time()
     for window_i in range(n_window_x):
         i_core = window_i * CORE_SIZE
         i_offset = i_core - max_travel_distance_in_pixels
@@ -336,13 +337,11 @@ def people_access(
             if j_offset+j_size >= raster_y_size:
                 j_size -= j_offset+j_size - raster_y_size + 1
 
-            LOGGER.debug(
-                f'window_i/j: {window_i},{window_j}\n'
-                f'i/j_offset: {i_offset},{j_offset}\n'
-                f'i/j_core: {i_core},{j_core}\n'
-                f'i/j_core_size: {i_core_size},{j_core_size}\n'
-                f'i/j_size: {i_size},{j_size}\n'
-                f'raster_x/y_size: {raster_x_size},{raster_y_size}')
+            if time.time() - last_report > 10.0:
+                last_report = time.time()
+                LOGGER.debug(
+                    f'processing {country_id}\n'
+                    f'\t{(window_j+window_i*n_window_y)/n_windows*100:.2f}% complete\n')
 
             friction_array = friction_band.ReadAsArray(
                 xoff=i_offset, yoff=j_offset,

@@ -90,12 +90,6 @@ def find_population_reach(
         (n_rows, n_cols))
     cdef numpy.ndarray[numpy.npy_bool, ndim=2] visited
 
-    LOGGER.debug(
-        f'core_i, core_j: {core_i},{core_j}\n'
-        f'core_size_i, core_size_j: {core_size_i},{core_size_j}\n'
-        f'n_rows, n_cols: {n_rows},{n_cols}')
-
-    #cdef list time_heap = []
     cdef int *ioff = [1, 1, 0, -1, -1, -1, 0, 1]
     cdef int *joff = [0, 1, 1, 1, 0, -1, -1, -1]
     cdef float *dist_edge = [
@@ -120,16 +114,13 @@ def find_population_reach(
             if population_val <= 0:
                 continue
             visited = numpy.zeros((n_rows, n_cols), dtype=bool)
-            # time_heap = [(0, (j_start, i_start))]
             pixel = ValuePixelType(0, i_start, j_start)
             dist_queue.push(pixel)
 
             # c_ -- current, n_ -- neighbor
             last_log_time = ctime(NULL)
             n_steps = 0
-            LOGGER.info(f'Processing {j_start}, {i_start} for {n_steps}')
             while dist_queue.size() > 0:
-                #c_time, (j, i) = heapq.heappop(time_heap)
                 pixel = dist_queue.top()
                 dist_queue.pop()
                 c_time = pixel.value
@@ -160,6 +151,4 @@ def find_population_reach(
                         pixel = ValuePixelType(n_time, i_n, j_n)
                         dist_queue.push(pixel)
             pop_coverage += population_val * visited
-    LOGGER.debug(
-        f'completed ({core_i}, {core_j}) in {time.time()-start_time}s')
     return pop_coverage
