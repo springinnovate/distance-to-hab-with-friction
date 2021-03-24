@@ -1,6 +1,5 @@
 """Distance to habitat with a friction layer."""
 import argparse
-import datetime
 import logging
 import math
 import multiprocessing
@@ -13,11 +12,8 @@ import time
 import pygeoprocessing
 import numpy
 from osgeo import gdal
-from osgeo import osr
-from osgeo import ogr
 import ecoshard
 import taskgraph
-import scipy.sparse.csgraph
 
 import shortest_distances
 
@@ -250,8 +246,8 @@ def main():
                 sinusoidal_hab_path, MAX_TRAVEL_TIME,
                 max_travel_distance_in_pixels, people_access_path,
                 normalized_people_access_path),
-            target_path_list=
-                [people_access_path, normalized_people_access_path],
+            target_path_list=[
+                people_access_path, normalized_people_access_path],
             dependent_task_list=[projection_task],
             transient_run=True,
             task_name='calculating people access for %s' % country_name)
