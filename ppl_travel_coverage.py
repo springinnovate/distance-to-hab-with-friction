@@ -16,7 +16,7 @@ import ecoshard
 import taskgraph
 import scipy.sparse.csgraph
 
-from . import shortest_distances
+import shortest_distances
 
 gdal.SetCacheMax(2**27)
 
