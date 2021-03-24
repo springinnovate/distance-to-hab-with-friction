@@ -229,7 +229,9 @@ def main():
             task_name=f'project and clip rasters for {country_name}')
 
         people_access_path = os.path.join(
-            country_workspace, 'people_access_%s.tif' % country_name)
+            country_workspace, f'people_access_{country_name}.tif')
+        normalized_people_access_path = os.path.join(
+            country_workspace, f'norm_people_access_{country_name}.tif')
         min_friction = get_min_nonzero_raster_value(sinusoidal_friction_path)
         max_travel_distance_in_pixels = math.ceil(
             1/min_friction*MAX_TRAVEL_TIME/TARGET_CELL_LENGTH_M)
@@ -243,7 +245,8 @@ def main():
                 country_name,
                 sinusoidal_friction_path, sinusoidal_population_path,
                 sinusoidal_hab_path, MAX_TRAVEL_TIME,
-                max_travel_distance_in_pixels, people_access_path),
+                max_travel_distance_in_pixels, people_access_path,
+                normalized_people_access_path),
             target_path_list=[people_access_path],
             dependent_task_list=[projection_task],
             transient_run=True,
@@ -410,7 +413,7 @@ def people_access(
                 (current_norm_pop_reach == -1) & valid_mask] = 0
             current_norm_pop_reach[valid_mask] += (
                 norm_population_reach[valid_mask])
-            people_access_band.WriteArray(
+            normalized_people_access_band.WriteArray(
                 current_norm_pop_reach, xoff=i_offset, yoff=j_offset)
 
     LOGGER.info(f'done with {target_people_access_path}')
