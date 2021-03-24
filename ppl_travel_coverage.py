@@ -602,6 +602,9 @@ def access_raster_worker(
                 current_norm_pop_reach, xoff=i_offset, yoff=j_offset)
             start_complete_queue.put(1)
 
+        LOGGER.info(
+            f'set access rasters to none for {target_people_access_path} and '
+            f'{target_normalized_people_access_path}')
         people_access_raster = None
         normalized_people_access_raster = None
         people_access_band = None
