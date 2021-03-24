@@ -273,6 +273,7 @@ def status_monitor(
         n_steps = start_complete_queue.get()
         LOGGER.info(f'status monitor expecting {n_steps} steps')
         steps_complete = 0
+        start_time = time.time()
         while True:
             time.sleep(5)
             while True:
@@ -282,7 +283,8 @@ def status_monitor(
                 except queue.Empty:
                     break
             LOGGER.info(
-                f'{status_id} is {steps_complete/n_steps*100:.2f}% complete')
+                f'{status_id} is {steps_complete/n_steps*100:.2f}% complete '
+                f'{time.time()-start_time}s so far')
             if steps_complete == n_steps:
                 LOGGER.info(f'done monitoring {status_id}')
                 return
@@ -340,7 +342,8 @@ def people_access(
         friction_raster_path)
     raster_x_size, raster_y_size = friction_raster_info['raster_size']
 
-    start_complete_queue = queue.Queue()
+    manager = multiprocessing.Manager()
+    start_complete_queue = manager.Queue()
     status_monitor_thread = threading.Thread(
         target=status_monitor,
         args=(start_complete_queue, country_id))
@@ -348,7 +351,8 @@ def people_access(
 
     shortest_distances_worker_thread_list = []
     work_queue = queue.Queue()
-    result_queue = queue.Queue()
+
+    result_queue = manager.Queue()
     for _ in range(multiprocessing.cpu_count()):
         shortest_distances_worker_thread = threading.Thread(
             target=shortest_distances_worker,
@@ -360,7 +364,7 @@ def people_access(
         shortest_distances_worker_thread_list.append(
             shortest_distances_worker_thread)
 
-    access_raster_worker_thread = threading.Thread(
+    access_raster_worker_thread = multiprocessing.Process(
         target=access_raster_worker,
         args=(
             result_queue, start_complete_queue, target_people_access_path,
