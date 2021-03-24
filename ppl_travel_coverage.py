@@ -123,18 +123,18 @@ def main():
 
     area_fid_list = []
 
-    sinusoidal_wkt = """PROJCS["World_Sinusoidal",
+    world_eckert_iv_wkt = """PROJCS["World_Eckert_IV",
         GEOGCS["GCS_WGS_1984",
             DATUM["WGS_1984",
                 SPHEROID["WGS_1984",6378137,298.257223563]],
             PRIMEM["Greenwich",0],
             UNIT["Degree",0.017453292519943295]],
-        PROJECTION["Sinusoidal"],
+        PROJECTION["Eckert_IV"],
         PARAMETER["False_Easting",0],
         PARAMETER["False_Northing",0],
         PARAMETER["Central_Meridian",0],
         UNIT["Meter",1],
-        AUTHORITY["EPSG","54008"]]"""
+        AUTHORITY["EPSG","54012"]]"""
 
     for country_feature in world_borders_layer:
         country_name = country_feature.GetField('NAME')
@@ -147,7 +147,7 @@ def main():
         country_geom = country_feature.GetGeometryRef()
 
         area_fid_list.append((
-            country_geom.GetArea(), sinusoidal_wkt,
+            country_geom.GetArea(), world_eckert_iv_wkt,
             country_name, country_feature.GetFID()))
 
     world_borders_layer.ResetReading()
@@ -219,7 +219,7 @@ def main():
                 (TARGET_CELL_LENGTH_M, -TARGET_CELL_LENGTH_M),
                 target_bounding_box),
             kwargs={
-                'target_projection_wkt': sinusoidal_wkt,
+                'target_projection_wkt': world_eckert_iv_wkt,
                 'vector_mask_options': {
                     'mask_vector_path': ecoshard_path_map['world_borders'],
                     'mask_vector_where_filter': f'"fid"={country_fid}'
