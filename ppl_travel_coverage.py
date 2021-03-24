@@ -270,9 +270,10 @@ def status_monitor(
         ``None``
     """
     n_steps = start_complete_queue.get()
+    LOGGER.info(f'status monitor expecting {n_steps} steps')
     steps_complete = 0
     while True:
-        time.sleep(10)
+        time.sleep(5)
         while True:
             try:
                 _ = start_complete_queue.get_nowait()
@@ -282,7 +283,8 @@ def status_monitor(
         LOGGER.info(
             f'{status_id} is {steps_complete/n_steps*100:.2f}% complete')
         if steps_complete == n_steps:
-            LOGGER.info(f'{status_id} 100% complete')
+            break
+            LOGGER.info(f'done monitoring {status_id}')
         return
 
 
@@ -482,7 +484,6 @@ def shortest_distances_worker(
 
     while True:
         payload = work_queue.get()
-        LOGGER.debug(f'shortest_distance_worker got {payload}')
         if payload is None:
             work_queue.put(None)
             break
@@ -561,7 +562,6 @@ def access_raster_worker(
         normalized_people_access_raster.GetRasterBand(1))
     while True:
         payload = work_queue.get()
-        LOGGER.debug(f'access_raster_worker got {payload}')
         if payload is None:
             LOGGER.info(
                 f'all done with {target_people_access_path} and '
