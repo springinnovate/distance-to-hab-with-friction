@@ -240,6 +240,7 @@ def main():
         people_access_task = task_graph.add_task(
             func=people_access,
             args=(
+                country_name,
                 sinusoidal_friction_path, sinusoidal_population_path,
                 sinusoidal_hab_path, MAX_TRAVEL_TIME,
                 max_travel_distance_in_pixels, people_access_path),
@@ -253,7 +254,8 @@ def main():
 
 
 def people_access(
-        friction_raster_path, population_raster_path, habitat_raster_path,
+        country_id, friction_raster_path, population_raster_path,
+        habitat_raster_path,
         max_travel_time, max_travel_distance_in_pixels,
         target_people_access_path):
     """Construct a people access raster showing where people can reach.
@@ -263,6 +265,7 @@ def people_access(
     `max_travel_distance`.
 
     Parameters:
+        country_id (str): country id just for logging
         friction_raster_path (str): path to a raster whose units are
             minutes/meter required to cross any given pixel. Values of 0 are
             treated as impassible.
@@ -347,7 +350,6 @@ def people_access(
             population_array = population_band.ReadAsArray(
                 xoff=i_offset, yoff=j_offset,
                 win_xsize=i_size, win_ysize=j_size)
-            LOGGER.debug(f'population_array.size {population_array.size}')
             pop_nodata_mask = numpy.isclose(
                 population_array, population_nodata)
             total_population = numpy.sum(population_array[~pop_nodata_mask])
@@ -370,7 +372,6 @@ def people_access(
                 friction_array.shape[1],
                 friction_array.shape[0],
                 MAX_TRAVEL_TIME)
-            LOGGER.debug('population reach size: %s', population_reach.shape)
             current_pop_reach = people_access_band.ReadAsArray(
                 xoff=i_offset, yoff=j_offset,
                 win_xsize=i_size, win_ysize=j_size)
