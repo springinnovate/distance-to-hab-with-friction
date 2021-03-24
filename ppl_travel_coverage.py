@@ -155,14 +155,14 @@ def main():
     population_raster_info = pygeoprocessing.get_raster_info(
         ecoshard_path_map['population_2017'])
     allowed_country_set = None
-    if args.country_name is not None:
+    if args.countries is not None:
         allowed_country_set = set(
-            [name.lower() for name in args.country_name])
+            [name.lower() for name in args.countries])
     for country_index, (
             country_area, utm_wkt, country_name, country_fid) in enumerate(
                 sorted(area_fid_list, reverse=True)):
         # put the index on there so we can see which one is done first
-        if args.country_name is not None and (
+        if args.countries is not None and (
                 country_name.lower() not in allowed_country_set):
             continue
         country_workspace = os.path.join(
