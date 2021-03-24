@@ -154,7 +154,7 @@ def find_population_reach(
                         # heapq.heappush(time_heap, (n_time, (j_n, i_n)))
                         pixel = ValuePixelType(n_time, i_n, j_n)
                         dist_queue.push(pixel)
-            pop_coverage[visited] += population_val[visited]
+            pop_coverage[visited] += population_val
             norm_pop_coverage[visited] += (
-                population_val[visited] / numpy.count_nonzero(visited))
+                population_val / numpy.count_nonzero(visited))
     return n_visited, pop_coverage, norm_pop_coverage
