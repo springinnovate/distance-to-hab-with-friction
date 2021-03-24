@@ -156,7 +156,7 @@ def find_population_reach(
                         if n_time <= max_time:
                             # heapq.heappush(time_heap, (n_time, (j_n, i_n)))
                             #pixel = ValuePixelType(n_time, i_n, j_n)
-                            pixel = ValuePixelType()
+                            #pixel = ValuePixelType()
                             pixel.value = n_time
                             pixel.i = i_n
                             pixel.j = j_n
