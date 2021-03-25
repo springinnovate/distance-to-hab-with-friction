@@ -155,7 +155,7 @@ def main():
 
     for dir_path in [WORKSPACE_DIR, CHURN_DIR, ECOSHARD_DIR]:
         os.makedirs(dir_path, exist_ok=True)
-    task_graph = taskgraph.TaskGraph(CHURN_DIR, 0)
+    task_graph = taskgraph.TaskGraph(CHURN_DIR, multiprocessing.cpu_count())
     ecoshard_path_map = {}
 
     for ecoshard_id, ecoshard_url in RASTER_ECOSHARD_URL_MAP.items():
