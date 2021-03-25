@@ -342,8 +342,8 @@ def people_access(
         friction_raster_path)
     raster_x_size, raster_y_size = friction_raster_info['raster_size']
 
-    manager = multiprocessing.Manager()
-    start_complete_queue = manager.Queue()
+    #manager = multiprocessing.Manager()
+    start_complete_queue = queue.Queue()
     status_monitor_thread = threading.Thread(
         target=status_monitor,
         args=(start_complete_queue, country_id))
@@ -352,7 +352,7 @@ def people_access(
     shortest_distances_worker_thread_list = []
     work_queue = queue.Queue()
 
-    result_queue = manager.Queue()
+    result_queue = queue.Queue()
     for _ in range(multiprocessing.cpu_count()):
         shortest_distances_worker_thread = threading.Thread(
             target=shortest_distances_worker,
