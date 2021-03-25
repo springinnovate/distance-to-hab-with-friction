@@ -245,7 +245,7 @@ def main():
         sinusoidal_population_band = sinusoidal_population_raster.GetRasterBand(1)
         sinusoidal_population_array = sinusoidal_population_band.ReadAsArray()
         sinusoidal_population_array[:] = 0
-        sinusoidal_population_array[sinusoidal_population_array.shape[1]//2, sinusoidal_population_array.shape[0]] = 1
+        sinusoidal_population_array[sinusoidal_population_array.shape[1]//2, sinusoidal_population_array.shape[0]//2] = 1
         sinusoidal_population_band.WriteArray(sinusoidal_population_array)
         sinusoidal_population_band = None
         sinusoidal_population_raster = None
