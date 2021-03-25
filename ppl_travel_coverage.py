@@ -467,8 +467,14 @@ def people_access(
 
     """
     min_friction = get_min_nonzero_raster_value(friction_raster_path)
-    max_travel_distance_in_pixels = math.ceil(
-        1/min_friction*max_travel_time/TARGET_CELL_LENGTH_M)
+    try:
+        max_travel_distance_in_pixels = math.ceil(
+            1/min_friction*max_travel_time/TARGET_CELL_LENGTH_M)
+    except:
+        LOGGER.exception(
+            f'bad stuff {country_id}: {min_friction}, {max_travel_time}, {TARGET_CELL_LENGTH_M})')
+        raise
+
     LOGGER.debug(
         f'min_friction: {min_friction}\n'
         f'max_travel_time: {max_travel_time}\n'
