@@ -42,7 +42,7 @@ POPULATION_COUNT_CUTOFF = 0
 # local distance pixel size
 TARGET_CELL_LENGTH_M = 1000
 # maximum window size to process one set of travel times over
-CORE_SIZE = 100
+CORE_SIZE = 800
 
 logging.basicConfig(
     level=logging.DEBUG,
