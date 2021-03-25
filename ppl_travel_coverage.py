@@ -287,13 +287,13 @@ def main():
     target_people_global_access_path = os.path.join(
         WORKSPACE_DIR, 'global_people_access.tif')
     pygeoprocessing.new_raster_from_base(
-        warped_pop_raster_path, target_people_global_access_path,
+        warped_pop_raster_path, (target_people_global_access_path, 1),
         gdal.GDT_Float32, [-1])
     target_normalized_people_global_access_path = os.path.join(
         WORKSPACE_DIR, 'global_normalized_people_access.tif')
     pygeoprocessing.new_raster_from_base(
         warped_pop_raster_path,
-        target_normalized_people_global_access_path, gdal.GDT_Float32,
+        (target_normalized_people_global_access_path, 1), gdal.GDT_Float32,
         [-1])
 
     task_graph.close()
