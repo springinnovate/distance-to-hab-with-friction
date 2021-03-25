@@ -106,8 +106,8 @@ def find_population_reach(
         cell_length_m*2**0.5,
         cell_length_m,
         cell_length_m*2**0.5]
-    cdef float frict_n, c_time, n_time, population_val
-    cdef int i_start, j_start, i_n, j_n
+    cdef float frict_n, c_time, n_time
+    cdef int i_start, j_start, i_n, j_n, population_val
 
     cdef DistPriorityQueueType dist_queue
     cdef ValuePixelType pixel
