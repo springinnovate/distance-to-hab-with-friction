@@ -62,7 +62,7 @@ LOGGER = logging.getLogger(__name__)
 @cython.cdivision(True)
 def find_population_reach(
         numpy.ndarray[float, ndim=2] friction_array,
-        numpy.ndarray[int, ndim=2] population_array,
+        numpy.ndarray[float, ndim=2] population_array,
         double cell_length_m, int core_i, int core_j,
         int core_size_i, int core_size_j,
         int n_cols, int n_rows,
@@ -108,8 +108,8 @@ def find_population_reach(
         cell_length_m*2**0.5,
         cell_length_m,
         cell_length_m*2**0.5]
-    cdef float frict_n, c_time, n_time, normalized_pop
-    cdef int i_start, j_start, i_n, j_n, population_val
+    cdef float frict_n, c_time, n_time, normalized_pop, population_val
+    cdef int i_start, j_start, i_n, j_n
     cdef int min_i, min_j, max_i, max_j
 
     cdef DistPriorityQueueType dist_queue
