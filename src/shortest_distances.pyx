@@ -113,60 +113,59 @@ def find_population_reach(
     cdef ValuePixelType pixel
     cdef int n_visited = 0, any_visited = 0
     visited = numpy.zeros((n_rows, n_cols), dtype=bool)
-    with nogil:
-        for i_start in range(core_i, core_i+core_size_i):
-            for j_start in range(core_j, core_j+core_size_j):
-                population_val = population_array[j_start, i_start]
-                if population_val <= 0:
-                    continue
-                pixel.value = 0
-                pixel.i = i_start
-                pixel.j = j_start
-                dist_queue.push(pixel)
-                n_visited = 1
-                any_visited = 1
+    for i_start in range(core_i, core_i+core_size_i):
+        for j_start in range(core_j, core_j+core_size_j):
+            population_val = population_array[j_start, i_start]
+            if population_val <= 0:
+                continue
+            pixel.value = 0
+            pixel.i = i_start
+            pixel.j = j_start
+            dist_queue.push(pixel)
+            n_visited = 1
+            any_visited = 1
 
-                # c_ -- current, n_ -- neighbor
-                last_log_time = ctime(NULL)
-                n_steps = 0
-                while dist_queue.size() > 0:
-                    pixel = dist_queue.top()
-                    dist_queue.pop()
-                    c_time = pixel.value
-                    i = pixel.i
-                    j = pixel.j
-                    visited[j, i] = True
-                    n_visited += 1
-                    pop_coverage[j, i] += population_val
-                    n_steps += 1
-                    if ctime(NULL) - last_log_time > 5.0:
-                        last_log_time = ctime(NULL)
-                        # LOGGER.info(
-                        #     f'Processing {j_start}, {i_start} for {n_steps}')
+            # c_ -- current, n_ -- neighbor
+            last_log_time = ctime(NULL)
+            n_steps = 0
+            while dist_queue.size() > 0:
+                pixel = dist_queue.top()
+                dist_queue.pop()
+                c_time = pixel.value
+                i = pixel.i
+                j = pixel.j
+                visited[j, i] = True
+                n_visited += 1
+                pop_coverage[j, i] += population_val
+                n_steps += 1
+                if ctime(NULL) - last_log_time > 5.0:
+                    last_log_time = ctime(NULL)
+                    # LOGGER.info(
+                    #     f'Processing {j_start}, {i_start} for {n_steps}')
 
-                    for v in range(8):
-                        i_n = i+ioff[v]
-                        j_n = j+joff[v]
-                        if i_n < 0 or i_n >= n_cols:
-                            continue
-                        if j_n < 0 or j_n >= n_rows:
-                            continue
-                        if visited[j_n, i_n]:
-                            continue
-                        frict_n = friction_array[j_n, i_n]
-                        if frict_n <= 0:
-                            continue
-                        n_time = c_time + frict_n*dist_edge[v]
-                        if n_time <= max_time:
-                            # heapq.heappush(time_heap, (n_time, (j_n, i_n)))
-                            #pixel = ValuePixelType(n_time, i_n, j_n)
-                            #pixel = ValuePixelType()
-                            pixel.value = n_time
-                            pixel.i = i_n
-                            pixel.j = j_n
-                            dist_queue.push(pixel)
-                with gil:
-                    norm_pop_coverage[visited] += (
-                        population_val / float(n_visited))
-                    visited[:] = 0
+                for v in range(8):
+                    i_n = i+ioff[v]
+                    j_n = j+joff[v]
+                    if i_n < 0 or i_n >= n_cols:
+                        continue
+                    if j_n < 0 or j_n >= n_rows:
+                        continue
+                    if visited[j_n, i_n]:
+                        continue
+                    frict_n = friction_array[j_n, i_n]
+                    if frict_n <= 0:
+                        continue
+                    n_time = c_time + frict_n*dist_edge[v]
+                    if n_time <= max_time:
+                        # heapq.heappush(time_heap, (n_time, (j_n, i_n)))
+                        #pixel = ValuePixelType(n_time, i_n, j_n)
+                        #pixel = ValuePixelType()
+                        pixel.value = n_time
+                        pixel.i = i_n
+                        pixel.j = j_n
+                        dist_queue.push(pixel)
+            with gil:
+                norm_pop_coverage[visited] += (
+                    population_val / float(n_visited))
+                visited[:] = 0
     return any_visited, pop_coverage, norm_pop_coverage
