@@ -244,9 +244,9 @@ def main():
             task_name=f'project and clip rasters for {country_name}')
 
         people_access_path = os.path.join(
-            country_workspace, f'people_access_{country_name}.tif')
+            country_workspace, f'people_access_{country_name}_{MAX_TRAVEL_TIME}m.tif')
         normalized_people_access_path = os.path.join(
-            country_workspace, f'norm_people_access_{country_name}.tif')
+            country_workspace, f'norm_people_access_{country_name}_{MAX_TRAVEL_TIME}m.tif')
         min_friction = get_min_nonzero_raster_value(sinusoidal_friction_path)
         max_travel_distance_in_pixels = math.ceil(
             1/min_friction*MAX_TRAVEL_TIME/TARGET_CELL_LENGTH_M)
@@ -282,12 +282,12 @@ def main():
         working_dir=WORKSPACE_DIR)
     # create access and normalized access paths
     target_people_global_access_path = os.path.join(
-        WORKSPACE_DIR, 'global_people_access.tif')
+        WORKSPACE_DIR, f'global_people_access_{MAX_TRAVEL_TIME}m.tif')
     pygeoprocessing.new_raster_from_base(
         warped_pop_raster_path, target_people_global_access_path,
         gdal.GDT_Float32, [-1])
     target_normalized_people_global_access_path = os.path.join(
-        WORKSPACE_DIR, 'global_normalized_people_access.tif')
+        WORKSPACE_DIR, f'global_normalized_people_access_{MAX_TRAVEL_TIME}m.tif')
     pygeoprocessing.new_raster_from_base(
         warped_pop_raster_path,
         target_normalized_people_global_access_path, gdal.GDT_Float32,
