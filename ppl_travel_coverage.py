@@ -82,11 +82,16 @@ def get_min_nonzero_raster_value(raster_path):
     nodata = band.GetNoDataValue()
     array = band.ReadAsArray()
     if nodata is not None:
-        valid_mask = ~numpy.isclose(array, nodata)
+        nodata_mask = numpy.isclose(array, nodata)
     else:
-        valid_mask = numpy.ones(array.shape, dtype=bool)
-    min_value = numpy.min(array[
-        valid_mask & numpy.isfinite(array) & (array > 0)])
+        nodata_mask = numpy.zeros(array.shape, dtype=bool)
+    valid_mask = ~nodata_mask & numpy.isfinite(array) & (array > 0)
+    if valid_mask.any():
+        min_value = numpy.min(valid_mask)
+    else:
+        # this happens on tiny areas like vatican, just set it nonsensical
+        # and that way it will stand out if it's ever an issue
+        min_value = 1
     band = None
     raster = None
     return min_value
