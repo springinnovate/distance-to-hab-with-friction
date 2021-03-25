@@ -111,7 +111,7 @@ def find_population_reach(
 
     cdef DistPriorityQueueType dist_queue
     cdef ValuePixelType pixel
-    cdef int n_visited = 0, any_visited = 0
+    cdef int n_visited, any_visited = 0
     for i_start in range(core_i, core_i+core_size_i):
         for j_start in range(core_j, core_j+core_size_j):
             population_val = population_array[j_start, i_start]
@@ -123,7 +123,6 @@ def find_population_reach(
             pixel.j = j_start
             dist_queue.push(pixel)
             any_visited = 1
-            n_visited = 0
 
             # c_ -- current, n_ -- neighbor
             while dist_queue.size() > 0:
@@ -133,8 +132,6 @@ def find_population_reach(
                 i = pixel.i
                 j = pixel.j
                 visited[j, i] = True
-                n_visited += 1
-                pop_coverage[j, i] += population_val
 
                 for v in range(8):
                     i_n = i+ioff[v]
@@ -155,6 +152,8 @@ def find_population_reach(
                         pixel.i = i_n
                         pixel.j = j_n
                         dist_queue.push(pixel)
+            pop_coverage[visited] += population_val
+            n_visited = numpy.count_nonzero(visited)
             norm_pop_coverage[visited] += (
                 population_val / float(n_visited))
     return any_visited, pop_coverage, norm_pop_coverage
