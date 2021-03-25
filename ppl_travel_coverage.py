@@ -513,8 +513,6 @@ def shortest_distances_worker(
             continue
 
         population_array[pop_nodata_mask] = 0.0
-        # # the nodata value is undefined but will present as 0.
-        friction_array[numpy.isclose(friction_array, 0)] = numpy.nan
 
         # doing i_core-i_offset and j_core-j_offset because those
         # do the offsets of the relative size of the array, not the
