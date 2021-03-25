@@ -279,10 +279,10 @@ def main():
         # make sure the bounding coordinates snap to pixel grid in global coords
         base_cell_length_deg = population_raster_info['pixel_size'][0]
         LOGGER.debug(f'lat/lng country_bb: {country_bb}')
-        # country_bb[0] -= country_bb[0] % base_cell_length_deg
-        # country_bb[1] -= country_bb[1] % base_cell_length_deg
-        # country_bb[2] += country_bb[2] % base_cell_length_deg
-        # country_bb[3] += country_bb[3] % base_cell_length_deg
+        country_bb[0] -= country_bb[0] % base_cell_length_deg
+        country_bb[1] -= country_bb[1] % base_cell_length_deg
+        country_bb[2] += country_bb[2] % base_cell_length_deg
+        country_bb[3] += country_bb[3] % base_cell_length_deg
 
         target_bounding_box = pygeoprocessing.transform_bounding_box(
             country_bb, osr.SRS_WKT_WGS84_LAT_LONG,
