@@ -282,6 +282,7 @@ def main():
         (TARGET_CELL_LENGTH_M, -TARGET_CELL_LENGTH_M),
         warped_pop_raster_path, 'near',
         target_projection_wkt=world_eckert_iv_wkt,
+        target_bb=[-16921202.923, -8460601.461, 16921797.077, 8461398.539],
         working_dir=WORKSPACE_DIR)
     # create access and normalized access paths
     target_people_global_access_path = os.path.join(
