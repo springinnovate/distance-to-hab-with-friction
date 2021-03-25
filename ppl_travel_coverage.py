@@ -13,7 +13,6 @@ import pygeoprocessing
 from pygeoprocessing.geoprocessing import _create_latitude_m2_area_column
 import numpy
 from osgeo import gdal
-from osgeo import osr
 import ecoshard
 import taskgraph
 
@@ -244,9 +243,6 @@ def main():
 
     world_borders_layer.ResetReading()
 
-    population_raster_info = pygeoprocessing.get_raster_info(
-        ecoshard_path_map[population_key])
-
     allowed_country_set = None
     if args.countries is not None:
         allowed_country_set = set(
@@ -288,7 +284,6 @@ def main():
         target_bounding_box[3] += target_bounding_box[3] % TARGET_CELL_LENGTH_M
         LOGGER.debug(f'projected country_bb: {target_bounding_box}')
 
-        return
         sinusoidal_friction_path = os.path.join(
             country_workspace, f'{country_name}_friction.tif')
         sinusoidal_population_path = os.path.join(
