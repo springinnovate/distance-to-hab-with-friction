@@ -10,6 +10,7 @@ import threading
 import time
 
 import pygeoprocessing
+from pygeoprocessing.geoprocessing import _create_latitude_m2_area_column
 import numpy
 from osgeo import gdal
 import ecoshard
@@ -41,6 +42,7 @@ MAX_TRAVEL_DISTANCE = 9999999
 POPULATION_COUNT_CUTOFF = 0
 # local distance pixel size
 TARGET_CELL_LENGTH_M = 1000
+TARGET_CELL_AREA_M2 = TARGET_CELL_LENGTH_M**2
 # maximum window size to process one set of travel times over
 CORE_SIZE = 256
 
@@ -90,6 +92,52 @@ def get_min_nonzero_raster_value(raster_path):
     return min_value
 
 
+def create_population_density(
+        wgs84_base_population_count_raster_path,
+        target_population_density_raster_path):
+    """Convert a wgs84 pop count raster into a population density raster.
+
+    Args:
+        wgs84_base_population_count_raster_path (str): path to population
+            count raster.
+        target_population_density_raster_path (str): path to target
+            population.
+
+    Return:
+        ``None``
+    """
+    base_raster_info = pygeoprocessing.get_raster_info(
+        wgs84_base_population_count_raster_path)
+    _, lat_min, _, lat_max = base_raster_info['bounding_box']
+    n_rows = base_raster_info['raster_size'][1]
+    m2_area_per_lat = _create_latitude_m2_area_column(
+        lat_min, lat_max, n_rows)
+
+    base_nodata = base_raster_info['nodata'][0]
+    target_nodata = -1
+
+    def _div_op(base_array, area):
+        """Scale non-nodata by scale."""
+        result = numpy.empty(base_array.shape, dtype=numpy.float32)
+        result[:] = target_nodata
+        if base_nodata is not None:
+            valid_mask = ~numpy.isclose(base_array, base_nodata)
+        else:
+            valid_mask = numpy.ones(
+                base_array.shape, dtype=bool)
+        result[valid_mask] = base_array[valid_mask] / area[valid_mask]
+        return result
+
+    # multiply the pixels in the resampled raster by the ratio of
+    # the pixel area in the wgs84 units divided by the area of the
+    # original pixel
+    pygeoprocessing.raster_calculator(
+        [(wgs84_base_population_count_raster_path, 1),
+         m2_area_per_lat], _div_op,
+        target_population_density_raster_path,
+        gdal.GDT_Float32, target_nodata)
+
+
 def main():
     """Entry point."""
     parser = argparse.ArgumentParser(description='People Travel Coverage')
@@ -120,6 +168,19 @@ def main():
             task_name=f'fetch {ecoshard_url}')
         ecoshard_path_map[ecoshard_id] = ecoshard_path
     task_graph.join()
+
+    target_population_density_raster_path = os.path.join(
+        CHURN_DIR,
+        f'density_{os.path.basename(ecoshard_path_map[population_key])}')
+    population_density_task = task_graph.add_task(
+        func=create_population_density,
+        args=(
+            ecoshard_path_map[population_key],
+            target_population_density_raster_path),
+        target_path_list=[target_population_density_raster_path],
+        task_name=f'create population density for {population_key}')
+    population_density_task.join()
+    ecoshard_path_map[population_key] = target_population_density_raster_path
 
     world_borders_vector = gdal.OpenEx(
         ecoshard_path_map['world_borders'], gdal.OF_VECTOR)
@@ -174,6 +235,7 @@ def main():
 
     population_raster_info = pygeoprocessing.get_raster_info(
         ecoshard_path_map[population_key])
+
     allowed_country_set = None
     if args.countries is not None:
         allowed_country_set = set(
@@ -350,7 +412,7 @@ def status_monitor(
 
 
 def people_access(
-        country_id, friction_raster_path, population_raster_path,
+        country_id, friction_raster_path, population_density_raster_path,
         habitat_raster_path, max_travel_time, target_people_access_path,
         target_normalized_people_access_path):
     """Construct a people access raster showing where people can reach.
@@ -364,8 +426,8 @@ def people_access(
         friction_raster_path (str): path to a raster whose units are
             minutes/meter required to cross any given pixel. Values of 0 are
             treated as impassible.
-        population_raster_path (str): path to a per-pixel population count
-            raster.
+        population_density_raster_path (str): path to a per-pixel population
+            density pop/m^2 raster.
         max_travel_time (float): maximum time to allow to travel in mins
         target_people_access_path (str): raster created that
             will contain the count of population that can reach any given
@@ -392,10 +454,10 @@ def people_access(
         f'max_travel_distance_in_pixels {max_travel_distance_in_pixels}')
 
     pygeoprocessing.new_raster_from_base(
-        population_raster_path, target_people_access_path, gdal.GDT_Float32,
-        [-1])
+        population_density_raster_path, target_people_access_path,
+        gdal.GDT_Float32, [-1])
     pygeoprocessing.new_raster_from_base(
-        population_raster_path, target_normalized_people_access_path,
+        population_density_raster_path, target_normalized_people_access_path,
         gdal.GDT_Float32, [-1])
 
     friction_raster_info = pygeoprocessing.get_raster_info(
@@ -418,19 +480,19 @@ def people_access(
             args=(
                 work_queue, result_queue, start_complete_queue,
                 friction_raster_path,
-                population_raster_path, max_travel_time))
+                population_density_raster_path, max_travel_time))
         shortest_distances_worker_thread.start()
         shortest_distances_worker_thread_list.append(
             shortest_distances_worker_thread)
 
-    access_raster_worker_thread = threading.Thread(
-        target=access_raster_worker,
+    access_raster_stitcher_thread = threading.Thread(
+        target=access_raster_stitcher,
         args=(
             result_queue, start_complete_queue,
             habitat_raster_path,
             target_people_access_path,
             target_normalized_people_access_path))
-    access_raster_worker_thread.start()
+    access_raster_stitcher_thread.start()
 
     n_window_x = math.ceil(raster_x_size / CORE_SIZE)
     n_window_y = math.ceil(raster_y_size / CORE_SIZE)
@@ -476,13 +538,13 @@ def people_access(
         worker_thread.join()
     LOGGER.info(f'done with workers')
     result_queue.put(None)
-    access_raster_worker_thread.join()
+    access_raster_stitcher_thread.join()
     LOGGER.info(f'done with access raster worker {target_people_access_path}')
 
 
 def shortest_distances_worker(
         work_queue, result_queue, start_complete_queue, friction_raster_path,
-        population_raster_path, max_travel_time):
+        population_density_raster_path, max_travel_time):
     """Process shortest distances worker.
 
     Args:
@@ -495,8 +557,8 @@ def shortest_distances_worker(
         friction_raster_path (str): path to a raster whose units are
             minutes/meter required to cross any given pixel. Values of 0 are
             treated as impassible.
-        population_raster_path (str): path to a per-pixel population count
-            raster.
+        population_density_raster_path (str): path to a per-pixel population
+            count raster.
         max_travel_time (float): max travel time in minutes
 
     Return:
@@ -504,7 +566,8 @@ def shortest_distances_worker(
     """
     friction_raster = gdal.OpenEx(friction_raster_path, gdal.OF_RASTER)
     friction_band = friction_raster.GetRasterBand(1)
-    population_raster = gdal.OpenEx(population_raster_path, gdal.OF_RASTER)
+    population_raster = gdal.OpenEx(
+        population_density_raster_path, gdal.OF_RASTER)
     population_band = population_raster.GetRasterBand(1)
     population_nodata = population_band.GetNoDataValue()
 
@@ -561,7 +624,7 @@ def shortest_distances_worker(
             (i_offset, j_offset, population_reach, norm_population_reach))
 
 
-def access_raster_worker(
+def access_raster_stitcher(
         work_queue, start_complete_queue,
         habitat_raster_path, target_people_access_path,
         target_normalized_people_access_path):
@@ -620,7 +683,8 @@ def access_raster_worker(
                 win_xsize=i_size, win_ysize=j_size)
             valid_mask = habitat_array == 1
             current_pop_reach[(current_pop_reach == -1) & valid_mask] = 0
-            current_pop_reach[valid_mask] += population_reach[valid_mask]
+            current_pop_reach[valid_mask] += population_reach[valid_mask] * (
+                TARGET_CELL_AREA_M2)
             people_access_band.WriteArray(
                 current_pop_reach, xoff=i_offset, yoff=j_offset)
 
@@ -631,7 +695,7 @@ def access_raster_worker(
             current_norm_pop_reach[
                 (current_norm_pop_reach == -1) & valid_mask] = 0
             current_norm_pop_reach[valid_mask] += (
-                norm_population_reach[valid_mask])
+                norm_population_reach[valid_mask] * TARGET_CELL_AREA_M2)
             normalized_people_access_band.WriteArray(
                 current_norm_pop_reach, xoff=i_offset, yoff=j_offset)
             start_complete_queue.put(1)
@@ -647,7 +711,7 @@ def access_raster_worker(
             f'done writing to {target_people_access_path} and '
             f'{target_normalized_people_access_path}')
     except Exception:
-        LOGGER.exception(f'something bad happened on access_raster_worker')
+        LOGGER.exception(f'something bad happened on access_raster_stitcher')
         raise
 
 
