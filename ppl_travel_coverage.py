@@ -298,7 +298,7 @@ def main():
 
     pygeoprocessing.stitch_rasters(
         people_access_path_list,
-        ['near']*len(people_access_path),
+        ['near']*len(people_access_path_list),
         (target_people_global_access_path, 1),
         overlap_algorithm='etch')
     pygeoprocessing.stitch_rasters(
