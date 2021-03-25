@@ -266,7 +266,6 @@ def main():
             target_path_list=[
                 people_access_path, normalized_people_access_path],
             dependent_task_list=[projection_task],
-            transient_run=True,
             task_name='calculating people access for %s' % country_name)
         people_access_path_list.append((people_access_path, 1))
         normalized_people_access_path_list.append(
@@ -279,7 +278,7 @@ def main():
     pygeoprocessing.warp_raster(
         ecoshard_path_map['population_2017'],
         (TARGET_CELL_LENGTH_M, -TARGET_CELL_LENGTH_M), warped_pop_raster_path,
-        'near', base_projection_wkt=world_eckert_iv_wkt,
+        'near', target_projection_wkt=world_eckert_iv_wkt,
         working_dir=WORKSPACE_DIR)
     # create access and normalized access paths
     target_people_global_access_path = os.path.join(
