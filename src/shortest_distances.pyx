@@ -157,6 +157,9 @@ def find_population_reach(
                             continue
                         if visited[j_n, i_n]:
                             continue
+                        if population_array[j_n, i_n] < 0:
+                            # nodata, so skip
+                            continue
                         frict_n = friction_array[j_n, i_n]
                         # the nodata value is undefined but will present as 0.
                         if frict_n <= 0:

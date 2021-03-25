@@ -609,7 +609,6 @@ def access_raster_worker(
                 normalized_people_access_band.ReadAsArray(
                     xoff=i_offset, yoff=j_offset,
                     win_xsize=i_size, win_ysize=j_size))
-            valid_mask = norm_population_reach > 0
             current_norm_pop_reach[
                 (current_norm_pop_reach == -1) & valid_mask] = 0
             current_norm_pop_reach[valid_mask] += (
