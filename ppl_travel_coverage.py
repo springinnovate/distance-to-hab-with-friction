@@ -277,7 +277,7 @@ def main():
     LOGGER.debug('create target global population layers')
     # warp population layer to target projection
     warped_pop_raster_path = os.path.join(
-        WORKSPACE_DIR, f'warped_{os.path.basename(ecoshard_path_map['population_2017'])}')
+        WORKSPACE_DIR, f"warped_{os.path.basename(ecoshard_path_map['population_2017'])}")
     pygeoprocessing.warp_raster(
         ecoshard_path_map['population_2017'],
         (TARGET_CELL_LENGTH_M, -TARGET_CELL_LENGTH_M), warped_pop_raster_path,
