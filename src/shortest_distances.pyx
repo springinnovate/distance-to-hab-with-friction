@@ -114,9 +114,10 @@ def find_population_reach(
     visited = numpy.zeros((n_rows, n_cols), dtype=bool)
     for i_start in range(core_i, core_i+core_size_i):
         for j_start in range(core_j, core_j+core_size_j):
-            population_val = population_array[j_start, i_start]
+            population_val = <float>(population_array[j_start, i_start])
             if population_val <= 0:
                 continue
+            visited[:] = 0
             pixel.value = 0
             pixel.i = i_start
             pixel.j = j_start
@@ -156,5 +157,4 @@ def find_population_reach(
                         dist_queue.push(pixel)
             norm_pop_coverage[visited] += (
                 population_val / float(n_visited))
-            visited[:] = 0
     return any_visited, pop_coverage, norm_pop_coverage

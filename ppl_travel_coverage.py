@@ -42,7 +42,7 @@ POPULATION_COUNT_CUTOFF = 0
 # local distance pixel size
 TARGET_CELL_LENGTH_M = 1000
 # maximum window size to process one set of travel times over
-CORE_SIZE = 800
+CORE_SIZE = 256
 
 logging.basicConfig(
     level=logging.DEBUG,
@@ -353,7 +353,7 @@ def people_access(
     work_queue = queue.Queue()
 
     result_queue = queue.Queue()
-    for _ in range(multiprocessing.cpu_count()):
+    for _ in range(16):
         shortest_distances_worker_thread = threading.Thread(
             target=shortest_distances_worker,
             args=(
