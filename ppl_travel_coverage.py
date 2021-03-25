@@ -255,13 +255,6 @@ def main():
             f'people_access_{country_name}_{population_key}_{max_travel_time}m.tif')
         normalized_people_access_path = os.path.join(
             country_workspace, f'norm_people_access_{country_name}_{max_travel_time}m.tif')
-        min_friction = get_min_nonzero_raster_value(sinusoidal_friction_path)
-        max_travel_distance_in_pixels = math.ceil(
-            1/min_friction*max_travel_time/TARGET_CELL_LENGTH_M)
-        LOGGER.debug(
-            f'min_friction: {min_friction}\n'
-            f'max_travel_time: {max_travel_time}\n'
-            f'max_travel_distance_in_pixels {max_travel_distance_in_pixels}')
 
         _ = task_graph.add_task(
             func=people_access,
@@ -269,7 +262,7 @@ def main():
                 country_name,
                 sinusoidal_friction_path, sinusoidal_population_path,
                 sinusoidal_hab_path, max_travel_time,
-                max_travel_distance_in_pixels, people_access_path,
+                people_access_path,
                 normalized_people_access_path),
             target_path_list=[
                 people_access_path, normalized_people_access_path],
@@ -355,9 +348,8 @@ def status_monitor(
 
 def people_access(
         country_id, friction_raster_path, population_raster_path,
-        habitat_raster_path,
-        max_travel_time, max_travel_distance_in_pixels,
-        target_people_access_path, target_normalized_people_access_path):
+        habitat_raster_path, max_travel_time, target_people_access_path,
+        target_normalized_people_access_path):
     """Construct a people access raster showing where people can reach.
 
     The people access raster will have a value of population count per pixel
@@ -371,10 +363,7 @@ def people_access(
             treated as impassible.
         population_raster_path (str): path to a per-pixel population count
             raster.
-        max_travel_time (float): the maximum amount of time in minutes to
-            allow when determining where population can travel to.
-        max_travel_distance_in_pixels (float): the maximum straight-line
-            pixel distance to allow. Used to define working buffers.
+        max_travel_time (float): maximum time to allow to travel in mins
         target_people_access_path (str): raster created that
             will contain the count of population that can reach any given
             pixel within the travel time and travel distance constraints.
@@ -391,6 +380,14 @@ def people_access(
         None.
 
     """
+    min_friction = get_min_nonzero_raster_value(friction_raster_path)
+    max_travel_distance_in_pixels = math.ceil(
+        1/min_friction*max_travel_time/TARGET_CELL_LENGTH_M)
+    LOGGER.debug(
+        f'min_friction: {min_friction}\n'
+        f'max_travel_time: {max_travel_time}\n'
+        f'max_travel_distance_in_pixels {max_travel_distance_in_pixels}')
+
     pygeoprocessing.new_raster_from_base(
         population_raster_path, target_people_access_path, gdal.GDT_Float32,
         [-1])
