@@ -22,6 +22,7 @@ gdal.SetCacheMax(2**27)
 RASTER_ECOSHARD_URL_MAP = {
     # minutes/meter
     'friction_surface': 'https://storage.googleapis.com/ecoshard-root/critical_natural_capital/friction_surface_2015_v1.0-002_md5_166d17746f5dd49cfb2653d721c2267c.tif',
+    'population_2017': 'https://storage.googleapis.com/ecoshard-root/population/lspop2017_md5_2e8da6824e4d67f8ea321ba4b585a,
     'lspop_2017_URCA_rural': 'https://storage.googleapis.com/ecoshard-root/population/lspop_2017_URCA_rural_md5_fe4ca0be95aa87a5e0ee6d7db83c0935.tif',
     'lspop_2017_URCA_urban': 'https://storage.googleapis.com/ecoshard-root/population/lspop_2017_URCA_urban_md5_ca344c73dfb71902ab99b4dca2a4a9fc.tif',
     'habitat_mask': 'https://storage.googleapis.com/critical-natural-capital-ecoshards/habmasks/masked_all_nathab_wstreams_esa2015_md5_c291ff6ef7db1d5ff4d95a82e0f035de.tif',
@@ -278,8 +279,9 @@ def main():
         WORKSPACE_DIR, f"warped_{os.path.basename(ecoshard_path_map[population_key])}")
     pygeoprocessing.warp_raster(
         ecoshard_path_map[population_key],
-        (TARGET_CELL_LENGTH_M, -TARGET_CELL_LENGTH_M), warped_pop_raster_path,
-        'near', target_projection_wkt=world_eckert_iv_wkt,
+        (TARGET_CELL_LENGTH_M, -TARGET_CELL_LENGTH_M),
+        warped_pop_raster_path, 'near',
+        target_projection_wkt=world_eckert_iv_wkt,
         working_dir=WORKSPACE_DIR)
     # create access and normalized access paths
     target_people_global_access_path = os.path.join(
