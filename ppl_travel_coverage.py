@@ -339,7 +339,7 @@ def main():
     # warp population layer to target projection
     warped_pop_raster_path = os.path.join(
         WORKSPACE_DIR, f"warped_{os.path.basename(ecoshard_path_map[population_key])}")
-    _ task_graph.add_task(
+    _ = task_graph.add_task(
         func=pygeoprocessing.warp_raster,
         args=(
             ecoshard_path_map[population_key],
