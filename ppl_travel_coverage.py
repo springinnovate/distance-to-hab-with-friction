@@ -82,9 +82,6 @@ def get_min_nonzero_raster_value(raster_path):
         valid_mask = ~numpy.isclose(array, nodata)
     else:
         valid_mask = numpy.ones(array.shape, dtype=bool)
-    LOGGER.debug(
-        f'nodata: {nodata}\n'
-        f'array: {array}')
     min_value = numpy.min(array[
         valid_mask & numpy.isfinite(array) & (array > 0)])
     band = None
@@ -287,13 +284,13 @@ def main():
     target_people_global_access_path = os.path.join(
         WORKSPACE_DIR, 'global_people_access.tif')
     pygeoprocessing.new_raster_from_base(
-        warped_pop_raster_path, (target_people_global_access_path, 1),
+        warped_pop_raster_path, target_people_global_access_path,
         gdal.GDT_Float32, [-1])
     target_normalized_people_global_access_path = os.path.join(
         WORKSPACE_DIR, 'global_normalized_people_access.tif')
     pygeoprocessing.new_raster_from_base(
         warped_pop_raster_path,
-        (target_normalized_people_global_access_path, 1), gdal.GDT_Float32,
+        target_normalized_people_global_access_path, gdal.GDT_Float32,
         [-1])
 
     task_graph.close()
@@ -302,12 +299,12 @@ def main():
     pygeoprocessing.stitch_rasters(
         people_access_path_list,
         ['near']*len(people_access_path),
-        target_people_global_access_path,
+        (target_people_global_access_path, 1),
         overlap_algorithm='etch')
     pygeoprocessing.stitch_rasters(
         normalized_people_access_path_list,
         ['near']*len(normalized_people_access_path_list),
-        target_normalized_people_global_access_path,
+        (target_normalized_people_global_access_path, 1),
         overlap_algorithm='etch')
 
 
