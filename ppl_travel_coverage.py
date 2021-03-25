@@ -352,6 +352,9 @@ def main():
             'working_dir': WORKSPACE_DIR},
         target_path_list=[warped_pop_raster_path],
         task_name=f'warp {warped_pop_raster_path}')
+    task_graph.close()
+    task_graph.join()
+
     # create access and normalized access paths
     target_people_global_access_path = os.path.join(
         WORKSPACE_DIR, f'global_people_access_{population_key}_{max_travel_time}m.tif')
@@ -365,8 +368,6 @@ def main():
         target_normalized_people_global_access_path, gdal.GDT_Float32,
         [-1])
 
-    task_graph.close()
-    task_graph.join()
 
     pygeoprocessing.stitch_rasters(
         people_access_path_list,
