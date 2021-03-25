@@ -284,7 +284,7 @@ def status_monitor(
                     break
             LOGGER.info(
                 f'{status_id} is {steps_complete/n_steps*100:.2f}% complete '
-                f'{time.time()-start_time}s so far')
+                f'{time.time()-start_time:.1f}s so far')
             if steps_complete == n_steps:
                 LOGGER.info(f'done monitoring {status_id}')
                 return
@@ -364,7 +364,7 @@ def people_access(
         shortest_distances_worker_thread_list.append(
             shortest_distances_worker_thread)
 
-    access_raster_worker_thread = multiprocessing.Process(
+    access_raster_worker_thread = threading.Thread(#multiprocessing.Process(
         target=access_raster_worker,
         args=(
             result_queue, start_complete_queue, target_people_access_path,
