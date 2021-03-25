@@ -122,18 +122,34 @@ def main():
 
     area_fid_list = []
 
-    world_eckert_iv_wkt = """PROJCS["World_Eckert_IV",
-        GEOGCS["GCS_WGS_1984",
-            DATUM["WGS_1984",
-                SPHEROID["WGS_1984",6378137,298.257223563]],
-            PRIMEM["Greenwich",0],
-            UNIT["Degree",0.017453292519943295]],
-        PROJECTION["Eckert_IV"],
-        PARAMETER["False_Easting",0],
-        PARAMETER["False_Northing",0],
-        PARAMETER["Central_Meridian",0],
-        UNIT["Meter",1],
-        AUTHORITY["EPSG","54012"]]"""
+    world_eckert_iv_wkt = """PROJCRS["unknown",
+    BASEGEOGCRS["GCS_unknown",
+        DATUM["World Geodetic System 1984",
+            ELLIPSOID["WGS 84",6378137,298.257223563,
+                LENGTHUNIT["metre",1]],
+            ID["EPSG",6326]],
+        PRIMEM["Greenwich",0,
+            ANGLEUNIT["Degree",0.0174532925199433]]],
+    CONVERSION["unnamed",
+        METHOD["Eckert IV"],
+        PARAMETER["Longitude of natural origin",0,
+            ANGLEUNIT["Degree",0.0174532925199433],
+            ID["EPSG",8802]],
+        PARAMETER["False easting",0,
+            LENGTHUNIT["metre",1],
+            ID["EPSG",8806]],
+        PARAMETER["False northing",0,
+            LENGTHUNIT["metre",1],
+            ID["EPSG",8807]]],
+    CS[Cartesian,2],
+        AXIS["(E)",east,
+            ORDER[1],
+            LENGTHUNIT["metre",1,
+                ID["EPSG",9001]]],
+        AXIS["(N)",north,
+            ORDER[2],
+            LENGTHUNIT["metre",1,
+                ID["EPSG",9001]]]]"""
 
     for country_feature in world_borders_layer:
         country_name = country_feature.GetField('NAME')
