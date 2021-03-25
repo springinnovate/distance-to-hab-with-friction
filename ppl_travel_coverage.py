@@ -41,7 +41,7 @@ MAX_TRAVEL_DISTANCE = 9999999
 # used to avoid computing paths where the population is too low
 POPULATION_COUNT_CUTOFF = 0
 # local distance pixel size
-TARGET_CELL_LENGTH_M = 1000
+TARGET_CELL_LENGTH_M = 2000
 TARGET_CELL_AREA_M2 = TARGET_CELL_LENGTH_M**2
 # maximum window size to process one set of travel times over
 CORE_SIZE = 256
