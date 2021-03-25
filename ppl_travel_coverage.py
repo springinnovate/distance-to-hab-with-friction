@@ -253,7 +253,7 @@ def main():
     people_access_path_list = []
     normalized_people_access_path_list = []
     for country_index, (
-            country_area, utm_wkt, country_name, country_fid) in enumerate(
+            country_area, target_wkt, country_name, country_fid) in enumerate(
                 sorted(area_fid_list, reverse=True)):
         # put the index on there so we can see which one is done first
         if args.countries is not None and (
@@ -286,15 +286,16 @@ def main():
         target_bounding_box = [
             v for v in pygeoprocessing.transform_bounding_box(
                 country_bb, world_borders_layer.GetSpatialRef().ExportToWkt(),
-                utm_wkt)]
+                target_wkt)]
 
         # make sure the bounding coordinates snap to pixel grid
+        LOGGER.debug(f'pre-projected country_bb: {target_bounding_box}')
         target_bounding_box[0] -= target_bounding_box[0] % TARGET_CELL_LENGTH_M
         target_bounding_box[1] -= target_bounding_box[1] % TARGET_CELL_LENGTH_M
         target_bounding_box[2] += target_bounding_box[2] % TARGET_CELL_LENGTH_M
         target_bounding_box[3] += target_bounding_box[3] % TARGET_CELL_LENGTH_M
         LOGGER.debug(f'projected country_bb: {target_bounding_box}')
-
+        return
         sinusoidal_friction_path = os.path.join(
             country_workspace, f'{country_name}_friction.tif')
         sinusoidal_population_path = os.path.join(
