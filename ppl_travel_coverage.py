@@ -527,7 +527,9 @@ def shortest_distances_worker(
                 friction_array.shape[0],
                 MAX_TRAVEL_TIME))
         if n_visited == 0:
-            # no need to write an empty array
+            LOGGER.debug(
+                f'no need to write an empty array skipping '
+                f'{i_offset} {j_offset}')
             start_complete_queue.put(1)
             continue
         result_queue.put(
