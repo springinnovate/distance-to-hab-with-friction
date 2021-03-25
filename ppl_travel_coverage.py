@@ -238,6 +238,18 @@ def main():
             f'min_friction: {min_friction}\n'
             f'max_travel_time: {MAX_TRAVEL_TIME}\n'
             f'max_travel_distance_in_pixels {max_travel_distance_in_pixels}')
+
+        # TODO: for testing
+        sinusoidal_population_raster = gdal.OpenEx(
+            sinusoidal_population_path, gdal.OF_RASTER | gdal.GA_Update)
+        sinusoidal_population_band = sinusoidal_population_raster.GetRasterBand(1)
+        sinusoidal_population_array = sinusoidal_population_band.ReadAsArray()
+        sinusoidal_population_array[:] = 0
+        sinusoidal_population_array[sinusoidal_population_array.shape[1]//2, sinusoidal_population_array.shape[0]] = 1
+        sinusoidal_population_band.WriteArray(sinusoidal_population_array)
+        sinusoidal_population_band = None
+        sinusoidal_population_raster = None
+
         people_access_task = task_graph.add_task(
             func=people_access,
             args=(
