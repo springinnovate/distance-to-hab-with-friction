@@ -13,6 +13,7 @@ import pygeoprocessing
 from pygeoprocessing.geoprocessing import _create_latitude_m2_area_column
 import numpy
 from osgeo import gdal
+from osgeo import osr
 import ecoshard
 import taskgraph
 
@@ -285,7 +286,7 @@ def main():
 
         target_bounding_box = [
             v for v in pygeoprocessing.transform_bounding_box(
-                country_bb, world_borders_layer.GetSpatialRef().ExportToWkt(),
+                country_bb, osr.SRS_WKT_WGS84_LAT_LONG,
                 target_wkt)]
 
         # make sure the bounding coordinates snap to pixel grid
