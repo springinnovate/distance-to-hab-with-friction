@@ -284,10 +284,9 @@ def main():
         country_bb[2] += country_bb[2] % base_cell_length_deg
         country_bb[3] += country_bb[3] % base_cell_length_deg
 
-        target_bounding_box = [
-            v for v in pygeoprocessing.transform_bounding_box(
-                country_bb, osr.SRS_WKT_WGS84_LAT_LONG,
-                target_wkt)]
+        target_bounding_box = pygeoprocessing.transform_bounding_box(
+            country_bb, osr.SRS_WKT_WGS84_LAT_LONG,
+            target_wkt, edge_samples=11)
 
         # make sure the bounding coordinates snap to pixel grid
         LOGGER.debug(f'pre-projected country_bb: {target_bounding_box}')
