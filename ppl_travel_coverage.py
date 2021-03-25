@@ -368,17 +368,26 @@ def main():
         target_normalized_people_global_access_path, gdal.GDT_Float32,
         [-1])
 
-
     pygeoprocessing.stitch_rasters(
         people_access_path_list,
         ['near']*len(people_access_path_list),
         (target_people_global_access_path, 1),
         overlap_algorithm='etch')
+    people_global_access_raster = gdal.OpenEx(
+        target_people_global_access_path, gdal.OF_RASTER | gdal.GA_Update)
+    people_global_access_band = people_global_access_raster.GetRasterBand(1)
+    people_global_access_band.ComputeStatistics(0)
+    people_global_access_band = None
     pygeoprocessing.stitch_rasters(
         normalized_people_access_path_list,
         ['near']*len(normalized_people_access_path_list),
         (target_normalized_people_global_access_path, 1),
         overlap_algorithm='etch')
+    normalized_people_global_access_raster = gdal.OpenEx(
+        target_normalized_people_global_access_path, gdal.OF_RASTER | gdal.GA_Update)
+    normalized_people_global_access_band = normalized_people_global_access_raster.GetRasterBand(1)
+    normalized_people_global_access_band.ComputeStatistics(0)
+    normalized_people_global_access_band = None
 
 
 def status_monitor(
