@@ -52,6 +52,7 @@ logging.basicConfig(
     stream=sys.stdout)
 LOGGER = logging.getLogger(__name__)
 logging.getLogger().addHandler(logging.FileHandler('log.txt'))
+logging.getLogger('taskgraph').setLevel(logging.ERROR)
 
 SKIP_THESE_COUNTRIES = [
     'Anguilla',
