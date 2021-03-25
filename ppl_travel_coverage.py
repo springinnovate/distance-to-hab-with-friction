@@ -332,7 +332,7 @@ def people_access(
 
     """
     pygeoprocessing.new_raster_from_base(
-        population_raster_path, target_people_access_path, gdal.GDT_Float32,
+        population_raster_path, target_people_access_path, gdal.GDT_Int64,
         [-1])
     pygeoprocessing.new_raster_from_base(
         population_raster_path, target_normalized_people_access_path,

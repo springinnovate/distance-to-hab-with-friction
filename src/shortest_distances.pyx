@@ -88,11 +88,12 @@ def find_population_reach(
 
     """
     cdef int i, j
-    cdef numpy.ndarray[double, ndim=2] pop_coverage = numpy.zeros(
-        (n_rows, n_cols))
-    cdef numpy.ndarray[double, ndim=2] norm_pop_coverage = numpy.zeros(
-        (n_rows, n_cols))
-    cdef numpy.ndarray[numpy.npy_bool, ndim=2] visited
+    cdef numpy.ndarray[long long, ndim=2] pop_coverage = numpy.zeros(
+        (n_rows, n_cols), dtype=numpy.int64)
+    cdef numpy.ndarray[float, ndim=2] norm_pop_coverage = numpy.zeros(
+        (n_rows, n_cols), dtype=numpy.float32)
+    cdef numpy.ndarray[numpy.npy_bool, ndim=2] visited = numpy.zeros(
+        (n_rows, n_cols), dtype=bool)
 
     cdef int *ioff = [1, 1, 0, -1, -1, -1, 0, 1]
     cdef int *joff = [0, 1, 1, 1, 0, -1, -1, -1]
@@ -111,11 +112,12 @@ def find_population_reach(
     cdef DistPriorityQueueType dist_queue
     cdef ValuePixelType pixel
     cdef int n_visited = 0, any_visited = 0
-    visited = numpy.zeros((n_rows, n_cols), dtype=bool)
     for i_start in range(core_i, core_i+core_size_i):
         for j_start in range(core_j, core_j+core_size_j):
-            population_val = <float>(population_array[j_start, i_start])
+            population_val = population_array[j_start, i_start]
             if population_val <= 0:
+                if population_val == 0:
+                    pop_coverage[j, i] = 0
                 continue
             visited[:] = 0
             pixel.value = 0
