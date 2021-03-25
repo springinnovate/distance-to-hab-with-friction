@@ -118,9 +118,10 @@ def find_population_reach(
             population_val = population_array[j_start, i_start]
             if population_val <= 0:
                 continue
-            pixel.value = 0
-            pixel.i = i_start
-            pixel.j = j_start
+            pixel = ValuePixelType(0, i_start, j_start)
+            # pixel.value = 0
+            # pixel.i = i_start
+            # pixel.j = j_start
             dist_queue.push(pixel)
             n_visited = 1
             any_visited = 1
@@ -158,11 +159,11 @@ def find_population_reach(
                     n_time = c_time + frict_n*dist_edge[v]
                     if n_time <= max_time:
                         # heapq.heappush(time_heap, (n_time, (j_n, i_n)))
-                        #pixel = ValuePixelType(n_time, i_n, j_n)
+                        pixel = ValuePixelType(n_time, i_n, j_n)
                         #pixel = ValuePixelType()
-                        pixel.value = n_time
-                        pixel.i = i_n
-                        pixel.j = j_n
+                        # pixel.value = n_time
+                        # pixel.i = i_n
+                        # pixel.j = j_n
                         dist_queue.push(pixel)
             norm_pop_coverage[visited] += (
                 population_val / float(n_visited))
