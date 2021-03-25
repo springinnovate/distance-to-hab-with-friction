@@ -22,7 +22,8 @@ gdal.SetCacheMax(2**27)
 RASTER_ECOSHARD_URL_MAP = {
     # minutes/meter
     'friction_surface': 'https://storage.googleapis.com/ecoshard-root/critical_natural_capital/friction_surface_2015_v1.0-002_md5_166d17746f5dd49cfb2653d721c2267c.tif',
-    'population_2017': 'https://storage.googleapis.com/ecoshard-root/population/lspop2017_md5_2e8da6824e4d67f8ea321ba4b585a3a5.tif',
+    'lspop_2017_URCA_rural': 'https://storage.googleapis.com/ecoshard-root/population/lspop_2017_URCA_rural_md5_fe4ca0be95aa87a5e0ee6d7db83c0935.tif',
+    'lspop_2017_URCA_urban': 'https://storage.googleapis.com/ecoshard-root/population/lspop_2017_URCA_urban_md5_ca344c73dfb71902ab99b4dca2a4a9fc.tif',
     'habitat_mask': 'https://storage.googleapis.com/critical-natural-capital-ecoshards/habmasks/masked_all_nathab_wstreams_esa2015_md5_c291ff6ef7db1d5ff4d95a82e0f035de.tif',
     'world_borders': 'https://storage.googleapis.com/ecoshard-root/critical_natural_capital/TM_WORLD_BORDERS-0.3_simplified_md5_47f2059be8d4016072aa6abe77762021.gpkg',
 }
@@ -33,8 +34,6 @@ CHURN_DIR = os.path.join(WORKSPACE_DIR, 'churn')
 ECOSHARD_DIR = os.path.join(WORKSPACE_DIR, 'ecoshard')
 TARGET_NODATA = -1
 
-# max travel time in minutes, basing off of half of a travel day (roundtrip)
-MAX_TRAVEL_TIME = 1*60  # minutes
 # max travel distance to cutoff simulation
 MAX_TRAVEL_DISTANCE = 9999999
 # used to avoid computing paths where the population is too low
@@ -94,9 +93,16 @@ def main():
     """Entry point."""
     parser = argparse.ArgumentParser(description='People Travel Coverage')
     parser.add_argument(
+        'population_key', help='population ecoshard key to simulate')
+    parser.add_argument(
+        'travel_time_m', help='travel time in minutes')
+    parser.add_argument(
         '--countries', type=str, nargs='+',
         help='comma separated list of countries to simulate')
     args = parser.parse_args()
+
+    population_key = args.population_key
+    max_travel_time = args.max_travel_time
 
     for dir_path in [WORKSPACE_DIR, CHURN_DIR, ECOSHARD_DIR]:
         os.makedirs(dir_path, exist_ok=True)
@@ -166,7 +172,7 @@ def main():
     world_borders_layer.ResetReading()
 
     population_raster_info = pygeoprocessing.get_raster_info(
-        ecoshard_path_map['population_2017'])
+        ecoshard_path_map[population_key])
     allowed_country_set = None
     if args.countries is not None:
         allowed_country_set = set(
@@ -185,7 +191,7 @@ def main():
         os.makedirs(country_workspace, exist_ok=True)
         base_raster_path_list = [
             ecoshard_path_map['friction_surface'],
-            ecoshard_path_map['population_2017'],
+            ecoshard_path_map[population_key],
             ecoshard_path_map['habitat_mask'],
         ]
 
@@ -217,11 +223,12 @@ def main():
         LOGGER.debug(f'projected country_bb: {target_bounding_box}')
 
         sinusoidal_friction_path = os.path.join(
-            country_workspace, 'sinusoidal_%s_friction.tif' % country_name)
+            country_workspace, f'{country_name}_friction.tif')
         sinusoidal_population_path = os.path.join(
-            country_workspace, 'sinusoidal_%s_population.tif' % country_name)
+            country_workspace,
+            f'{country_name}_population_{population_key}.tif')
         sinusoidal_hab_path = os.path.join(
-            country_workspace, 'sinusoidal_%s_hab.tif' % country_name)
+            country_workspace, f'sinusoidal_{country_name}_hab.tif')
         sinusoidal_raster_path_list = [
             sinusoidal_friction_path, sinusoidal_population_path,
             sinusoidal_hab_path]
@@ -244,23 +251,24 @@ def main():
             task_name=f'project and clip rasters for {country_name}')
 
         people_access_path = os.path.join(
-            country_workspace, f'people_access_{country_name}_{MAX_TRAVEL_TIME}m.tif')
+            country_workspace,
+            f'people_access_{country_name}_{population_key}_{max_travel_time}m.tif')
         normalized_people_access_path = os.path.join(
-            country_workspace, f'norm_people_access_{country_name}_{MAX_TRAVEL_TIME}m.tif')
+            country_workspace, f'norm_people_access_{country_name}_{max_travel_time}m.tif')
         min_friction = get_min_nonzero_raster_value(sinusoidal_friction_path)
         max_travel_distance_in_pixels = math.ceil(
-            1/min_friction*MAX_TRAVEL_TIME/TARGET_CELL_LENGTH_M)
+            1/min_friction*max_travel_time/TARGET_CELL_LENGTH_M)
         LOGGER.debug(
             f'min_friction: {min_friction}\n'
-            f'max_travel_time: {MAX_TRAVEL_TIME}\n'
+            f'max_travel_time: {max_travel_time}\n'
             f'max_travel_distance_in_pixels {max_travel_distance_in_pixels}')
 
-        people_access_task = task_graph.add_task(
+        _ = task_graph.add_task(
             func=people_access,
             args=(
                 country_name,
                 sinusoidal_friction_path, sinusoidal_population_path,
-                sinusoidal_hab_path, MAX_TRAVEL_TIME,
+                sinusoidal_hab_path, max_travel_time,
                 max_travel_distance_in_pixels, people_access_path,
                 normalized_people_access_path),
             target_path_list=[
@@ -274,20 +282,20 @@ def main():
     LOGGER.debug('create target global population layers')
     # warp population layer to target projection
     warped_pop_raster_path = os.path.join(
-        WORKSPACE_DIR, f"warped_{os.path.basename(ecoshard_path_map['population_2017'])}")
+        WORKSPACE_DIR, f"warped_{os.path.basename(ecoshard_path_map[population_key])}")
     pygeoprocessing.warp_raster(
-        ecoshard_path_map['population_2017'],
+        ecoshard_path_map[population_key],
         (TARGET_CELL_LENGTH_M, -TARGET_CELL_LENGTH_M), warped_pop_raster_path,
         'near', target_projection_wkt=world_eckert_iv_wkt,
         working_dir=WORKSPACE_DIR)
     # create access and normalized access paths
     target_people_global_access_path = os.path.join(
-        WORKSPACE_DIR, f'global_people_access_{MAX_TRAVEL_TIME}m.tif')
+        WORKSPACE_DIR, f'global_people_access_{population_key}_{max_travel_time}m.tif')
     pygeoprocessing.new_raster_from_base(
         warped_pop_raster_path, target_people_global_access_path,
         gdal.GDT_Float32, [-1])
     target_normalized_people_global_access_path = os.path.join(
-        WORKSPACE_DIR, f'global_normalized_people_access_{MAX_TRAVEL_TIME}m.tif')
+        WORKSPACE_DIR, f'global_normalized_people_access_{population_key}_{max_travel_time}m.tif')
     pygeoprocessing.new_raster_from_base(
         warped_pop_raster_path,
         target_normalized_people_global_access_path, gdal.GDT_Float32,
@@ -394,7 +402,6 @@ def people_access(
         friction_raster_path)
     raster_x_size, raster_y_size = friction_raster_info['raster_size']
 
-    #manager = multiprocessing.Manager()
     start_complete_queue = queue.Queue()
     status_monitor_thread = threading.Thread(
         target=status_monitor,
@@ -411,7 +418,7 @@ def people_access(
             args=(
                 work_queue, result_queue, start_complete_queue,
                 friction_raster_path,
-                population_raster_path))
+                population_raster_path, max_travel_time))
         shortest_distances_worker_thread.start()
         shortest_distances_worker_thread_list.append(
             shortest_distances_worker_thread)
@@ -470,52 +477,12 @@ def people_access(
     LOGGER.info(f'done with workers')
     result_queue.put(None)
     access_raster_worker_thread.join()
-    LOGGER.info(f'done with access raster worker')
-    # population_array[pop_nodata_mask] = 0.0
-    # # # the nodata value is undefined but will present as 0.
-    # friction_array[numpy.isclose(friction_array, 0)] = numpy.nan
-
-    # # doing i_core-i_offset and j_core-j_offset because those
-    # # do the offsets of the relative size of the array, not the
-    # # global extents
-    # n_visited, population_reach, norm_population_reach = shortest_distances.find_population_reach(
-    #     friction_array, population_array,
-    #     cell_length,
-    #     i_core-i_offset, j_core-j_offset,
-    #     i_core_size, j_core_size,
-    #     friction_array.shape[1],
-    #     friction_array.shape[0],
-    #     MAX_TRAVEL_TIME)
-    # if n_visited == 0:
-    #     # no need to write an empty array
-    #     continue
-    # current_pop_reach = people_access_band.ReadAsArray(
-    #     xoff=i_offset, yoff=j_offset,
-    #     win_xsize=i_size, win_ysize=j_size)
-    # valid_mask = population_reach > 0
-    # current_pop_reach[(current_pop_reach == -1) & valid_mask] = 0
-    # current_pop_reach[valid_mask] += population_reach[valid_mask]
-    # people_access_band.WriteArray(
-    #     current_pop_reach, xoff=i_offset, yoff=j_offset)
-
-    # current_norm_pop_reach = (
-    #     normalized_people_access_band.ReadAsArray(
-    #         xoff=i_offset, yoff=j_offset,
-    #         win_xsize=i_size, win_ysize=j_size))
-    # valid_mask = norm_population_reach > 0
-    # current_norm_pop_reach[
-    #     (current_norm_pop_reach == -1) & valid_mask] = 0
-    # current_norm_pop_reach[valid_mask] += (
-    #     norm_population_reach[valid_mask])
-    # normalized_people_access_band.WriteArray(
-    #     current_norm_pop_reach, xoff=i_offset, yoff=j_offset)
-
-    LOGGER.info(f'done with {target_people_access_path}')
+    LOGGER.info(f'done with access raster worker {target_people_access_path}')
 
 
 def shortest_distances_worker(
         work_queue, result_queue, start_complete_queue, friction_raster_path,
-        population_raster_path):
+        population_raster_path, max_travel_time):
     """Process shortest distances worker.
 
     Args:
@@ -530,6 +497,7 @@ def shortest_distances_worker(
             treated as impassible.
         population_raster_path (str): path to a per-pixel population count
             raster.
+        max_travel_time (float): max travel time in minutes
 
     Return:
         ``None``
@@ -582,7 +550,7 @@ def shortest_distances_worker(
                 i_core_size, j_core_size,
                 friction_array.shape[1],
                 friction_array.shape[0],
-                MAX_TRAVEL_TIME))
+                max_travel_time))
         if n_visited == 0:
             LOGGER.debug(
                 f'no need to write an empty array skipping '
