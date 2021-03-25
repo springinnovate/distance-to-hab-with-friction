@@ -339,13 +339,19 @@ def main():
     # warp population layer to target projection
     warped_pop_raster_path = os.path.join(
         WORKSPACE_DIR, f"warped_{os.path.basename(ecoshard_path_map[population_key])}")
-    pygeoprocessing.warp_raster(
-        ecoshard_path_map[population_key],
-        (TARGET_CELL_LENGTH_M, -TARGET_CELL_LENGTH_M),
-        warped_pop_raster_path, 'near',
-        target_projection_wkt=world_eckert_iv_wkt,
-        target_bb=[-16921202.923, -8460601.461, 16921797.077, 8461398.539],
-        working_dir=WORKSPACE_DIR)
+    _ task_graph.add_task(
+        func=pygeoprocessing.warp_raster,
+        args=(
+            ecoshard_path_map[population_key],
+            (TARGET_CELL_LENGTH_M, -TARGET_CELL_LENGTH_M),
+            warped_pop_raster_path, 'near'),
+        kwargs={
+            'target_projection_wkt': world_eckert_iv_wkt,
+            'target_bb': [
+                -16921202.923, -8460601.461, 16921797.077, 8461398.539],
+            'working_dir': WORKSPACE_DIR},
+        target_path_list=[warped_pop_raster_path],
+        task_name=f'warp {warped_pop_raster_path}')
     # create access and normalized access paths
     target_people_global_access_path = os.path.join(
         WORKSPACE_DIR, f'global_people_access_{population_key}_{max_travel_time}m.tif')
