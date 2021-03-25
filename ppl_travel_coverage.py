@@ -87,7 +87,7 @@ def get_min_nonzero_raster_value(raster_path):
         nodata_mask = numpy.zeros(array.shape, dtype=bool)
     valid_mask = ~nodata_mask & numpy.isfinite(array) & (array > 0)
     if valid_mask.any():
-        min_value = numpy.min(valid_mask)
+        min_value = numpy.min(array[valid_mask])
     else:
         # this happens on tiny areas like vatican, just set it nonsensical
         # and that way it will stand out if it's ever an issue
@@ -467,13 +467,8 @@ def people_access(
 
     """
     min_friction = get_min_nonzero_raster_value(friction_raster_path)
-    try:
-        max_travel_distance_in_pixels = math.ceil(
-            1/min_friction*max_travel_time/TARGET_CELL_LENGTH_M)
-    except:
-        LOGGER.exception(
-            f'bad stuff {country_id}: {min_friction}, {max_travel_time}, {TARGET_CELL_LENGTH_M})')
-        raise
+    max_travel_distance_in_pixels = math.ceil(
+        1/min_friction*max_travel_time/TARGET_CELL_LENGTH_M)
 
     LOGGER.debug(
         f'min_friction: {min_friction}\n'
