@@ -509,6 +509,9 @@ def shortest_distances_worker(
         total_population = numpy.sum(population_array[~pop_nodata_mask])
         # don't route population where there isn't any
         if total_population < POPULATION_COUNT_CUTOFF:
+            LOGGER.debug(
+                f'skipping because {total_population} < '
+                f'{POPULATION_COUNT_CUTOFF}')
             start_complete_queue.put(1)
             continue
 
