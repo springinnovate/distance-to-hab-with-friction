@@ -88,8 +88,8 @@ def find_population_reach(
 
     """
     cdef int i, j
-    cdef numpy.ndarray[long long, ndim=2] pop_coverage = numpy.zeros(
-        (n_rows, n_cols), dtype=numpy.int64)
+    cdef numpy.ndarray[float, ndim=2] pop_coverage = numpy.zeros(
+        (n_rows, n_cols), dtype=numpy.float32)
     cdef numpy.ndarray[float, ndim=2] norm_pop_coverage = numpy.zeros(
         (n_rows, n_cols), dtype=numpy.float32)
     cdef numpy.ndarray[numpy.npy_bool, ndim=2] visited = numpy.zeros(
@@ -116,8 +116,6 @@ def find_population_reach(
         for j_start in range(core_j, core_j+core_size_j):
             population_val = population_array[j_start, i_start]
             if population_val <= 0:
-                if population_val == 0:
-                    pop_coverage[j, i] = 0
                 continue
             visited[:] = 0
             pixel.value = 0

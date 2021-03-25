@@ -332,7 +332,7 @@ def people_access(
 
     """
     pygeoprocessing.new_raster_from_base(
-        population_raster_path, target_people_access_path, gdal.GDT_Int64,
+        population_raster_path, target_people_access_path, gdal.GDT_Float32,
         [-1])
     pygeoprocessing.new_raster_from_base(
         population_raster_path, target_normalized_people_access_path,
@@ -367,7 +367,9 @@ def people_access(
     access_raster_worker_thread = threading.Thread(#multiprocessing.Process(
         target=access_raster_worker,
         args=(
-            result_queue, start_complete_queue, target_people_access_path,
+            result_queue, start_complete_queue,
+            population_raster_path,
+            target_people_access_path,
             target_normalized_people_access_path))
     access_raster_worker_thread.start()
 
@@ -540,7 +542,8 @@ def shortest_distances_worker(
 
 
 def access_raster_worker(
-        work_queue, start_complete_queue, target_people_access_path,
+        work_queue, start_complete_queue, base_population_path,
+        target_people_access_path,
         target_normalized_people_access_path):
     """Write arrays from the work queue as they come in.
 
@@ -549,6 +552,8 @@ def access_raster_worker(
             (n_valid, i_offset, j_offset, people_access,
              normalized_people_access)
         start_complete_queue (queue): put a 1 in here for each block complete
+        base_population_path (str): path to base population layer, used to
+            determine where valid pixels lie.
         target_people_access_path (str): raster created that
             will contain the count of population that can reach any given
             pixel within the travel time and travel distance constraints.
@@ -565,6 +570,9 @@ def access_raster_worker(
         ``None``
     """
     try:
+        base_population_raster = gdal.OpenEx(
+            base_population_path, gdal.OF_RASTER)
+        base_population_band = base_population_raster.GetRasterBand(1)
         people_access_raster = gdal.OpenEx(
             target_people_access_path, gdal.OF_RASTER | gdal.GA_Update)
         people_access_band = people_access_raster.GetRasterBand(1)
@@ -587,7 +595,10 @@ def access_raster_worker(
             current_pop_reach = people_access_band.ReadAsArray(
                 xoff=i_offset, yoff=j_offset,
                 win_xsize=i_size, win_ysize=j_size)
-            valid_mask = population_reach > 0
+            base_population = base_population_band.ReadAsArray(
+                xoff=i_offset, yoff=j_offset,
+                win_xsize=i_size, win_ysize=j_size)
+            valid_mask = base_population >= 0
             current_pop_reach[(current_pop_reach == -1) & valid_mask] = 0
             current_pop_reach[valid_mask] += population_reach[valid_mask]
             people_access_band.WriteArray(
