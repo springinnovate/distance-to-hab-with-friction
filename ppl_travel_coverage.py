@@ -100,7 +100,7 @@ def main():
 
     for dir_path in [WORKSPACE_DIR, CHURN_DIR, ECOSHARD_DIR]:
         os.makedirs(dir_path, exist_ok=True)
-    task_graph = taskgraph.TaskGraph(CHURN_DIR, -1)
+    task_graph = taskgraph.TaskGraph(CHURN_DIR, 0)
     ecoshard_path_map = {}
 
     for ecoshard_id, ecoshard_url in RASTER_ECOSHARD_URL_MAP.items():
@@ -405,7 +405,7 @@ def people_access(
     work_queue = queue.Queue()
 
     result_queue = queue.Queue()
-    for _ in range(16):
+    for _ in range(multiprocessing.cpu_count()):
         shortest_distances_worker_thread = threading.Thread(
             target=shortest_distances_worker,
             args=(
@@ -416,7 +416,7 @@ def people_access(
         shortest_distances_worker_thread_list.append(
             shortest_distances_worker_thread)
 
-    access_raster_worker_thread = threading.Thread(#multiprocessing.Process(
+    access_raster_worker_thread = threading.Thread(
         target=access_raster_worker,
         args=(
             result_queue, start_complete_queue,
