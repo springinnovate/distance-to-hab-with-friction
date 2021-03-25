@@ -95,7 +95,7 @@ def main():
     parser.add_argument(
         'population_key', help='population ecoshard key to simulate')
     parser.add_argument(
-        'travel_time_m', help='travel time in minutes')
+        'max_travel_time', help='travel time in minutes')
     parser.add_argument(
         '--countries', type=str, nargs='+',
         help='comma separated list of countries to simulate')
