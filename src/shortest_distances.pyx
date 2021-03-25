@@ -164,8 +164,7 @@ def find_population_reach(
                         pixel.i = i_n
                         pixel.j = j_n
                         dist_queue.push(pixel)
-            with gil:
-                norm_pop_coverage[visited] += (
-                    population_val / float(n_visited))
-                visited[:] = 0
+            norm_pop_coverage[visited] += (
+                population_val / float(n_visited))
+            visited[:] = 0
     return any_visited, pop_coverage, norm_pop_coverage
