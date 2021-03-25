@@ -57,7 +57,9 @@ logging.basicConfig(
 LOGGER = logging.getLogger(__name__)
 
 
+@cython.wraparound(False)
 @cython.boundscheck(False)
+@cython.cdivision(True)
 def find_population_reach(
         numpy.ndarray[float, ndim=2] friction_array,
         numpy.ndarray[int, ndim=2] population_array,
@@ -106,54 +108,76 @@ def find_population_reach(
         cell_length_m*2**0.5,
         cell_length_m,
         cell_length_m*2**0.5]
-    cdef float frict_n, c_time, n_time
+    cdef float frict_n, c_time, n_time, normalized_pop
     cdef int i_start, j_start, i_n, j_n, population_val
+    cdef int min_i, min_j, max_i, max_j
 
     cdef DistPriorityQueueType dist_queue
     cdef ValuePixelType pixel
     cdef int n_visited, any_visited = 0
-    for i_start in range(core_i, core_i+core_size_i):
-        for j_start in range(core_j, core_j+core_size_j):
-            population_val = population_array[j_start, i_start]
-            if population_val <= 0:
-                continue
-            visited[:] = 0
-            pixel.value = 0
-            pixel.i = i_start
-            pixel.j = j_start
-            dist_queue.push(pixel)
-            any_visited = 1
+    with nogil:
+        for i_start in range(core_i, core_i+core_size_i):
+            for j_start in range(core_j, core_j+core_size_j):
+                population_val = population_array[j_start, i_start]
+                if population_val <= 0:
+                    continue
+                pixel.value = 0
+                pixel.i = i_start
+                pixel.j = j_start
+                dist_queue.push(pixel)
+                any_visited = 1
+                min_i = i_start
+                max_i = i_start
+                min_j = j_start
+                max_j = j_start
 
-            # c_ -- current, n_ -- neighbor
-            while dist_queue.size() > 0:
-                pixel = dist_queue.top()
-                dist_queue.pop()
-                c_time = pixel.value
-                i = pixel.i
-                j = pixel.j
-                visited[j, i] = True
+                # c_ -- current, n_ -- neighbor
+                while dist_queue.size() > 0:
+                    pixel = dist_queue.top()
+                    dist_queue.pop()
+                    c_time = pixel.value
+                    i = pixel.i
+                    j = pixel.j
+                    visited[j, i] = True
+                    if i < min_i:
+                        min_i = i
+                    elif i > max_i:
+                        max_i = i
+                    if j < min_j:
+                        min_j = j
+                    elif j > max_j:
+                        max_j = j
 
-                for v in range(8):
-                    i_n = i+ioff[v]
-                    j_n = j+joff[v]
-                    if i_n < 0 or i_n >= n_cols:
-                        continue
-                    if j_n < 0 or j_n >= n_rows:
-                        continue
-                    if visited[j_n, i_n]:
-                        continue
-                    frict_n = friction_array[j_n, i_n]
-                    # the nodata value is undefined but will present as 0.
-                    if frict_n <= 0:
-                        continue
-                    n_time = c_time + frict_n*dist_edge[v]
-                    if n_time <= max_time:
-                        pixel.value = n_time
-                        pixel.i = i_n
-                        pixel.j = j_n
-                        dist_queue.push(pixel)
-            pop_coverage[visited] += population_val
-            n_visited = numpy.count_nonzero(visited)
-            norm_pop_coverage[visited] += (
-                population_val / float(n_visited))
+                    for v in range(8):
+                        i_n = i+ioff[v]
+                        j_n = j+joff[v]
+                        if i_n < 0 or i_n >= n_cols:
+                            continue
+                        if j_n < 0 or j_n >= n_rows:
+                            continue
+                        if visited[j_n, i_n]:
+                            continue
+                        frict_n = friction_array[j_n, i_n]
+                        # the nodata value is undefined but will present as 0.
+                        if frict_n <= 0:
+                            continue
+                        n_time = c_time + frict_n*dist_edge[v]
+                        if n_time <= max_time:
+                            pixel.value = n_time
+                            pixel.i = i_n
+                            pixel.j = j_n
+                            dist_queue.push(pixel)
+                n_visited = 0
+                for i in range(min_i, max_i+1):
+                    for j in range(min_j, max_j+1):
+                        if visited[j, i]:
+                            n_visited += 1
+                            pop_coverage[j, i] += population_val
+                normalized_pop = population_val / float(n_visited)
+                for i in range(min_i, max_i+1):
+                    for j in range(min_j, max_j+1):
+                        if visited[j, i]:
+                            norm_pop_coverage[j, i] += normalized_pop
+                            # reset for next iteration
+                            visited[j, i] = 0
     return any_visited, pop_coverage, norm_pop_coverage
