@@ -173,6 +173,8 @@ def main():
     if args.countries is not None:
         allowed_country_set = set(
             [name.lower() for name in args.countries])
+    people_access_path_list = []
+    normalized_people_access_path_list = []
     for country_index, (
             country_area, utm_wkt, country_name, country_fid) in enumerate(
                 sorted(area_fid_list, reverse=True)):
@@ -268,9 +270,45 @@ def main():
             dependent_task_list=[projection_task],
             transient_run=True,
             task_name='calculating people access for %s' % country_name)
+        people_access_path_list.append((people_access_path, 1))
+        normalized_people_access_path_list.append(
+            (normalized_people_access_path, 1))
+
+    LOGGER.debug('create target global population layers')
+    # warp population layer to target projection
+    warped_pop_raster_path = os.path.join(
+        WORKSPACE_DIR, f'warped_{os.path.basename(ecoshard_path_map['population_2017'])}')
+    pygeoprocessing.warp_raster(
+        ecoshard_path_map['population_2017'],
+        (TARGET_CELL_LENGTH_M, -TARGET_CELL_LENGTH_M), warped_pop_raster_path,
+        'near', base_projection_wkt=world_eckert_iv_wkt,
+        working_dir=WORKSPACE_DIR)
+    # create access and normalized access paths
+    target_people_global_access_path = os.path.join(
+        WORKSPACE_DIR, 'global_people_access.tif')
+    pygeoprocessing.new_raster_from_base(
+        warped_pop_raster_path, target_people_global_access_path,
+        gdal.GDT_Float32, [-1])
+    target_normalized_people_global_access_path = os.path.join(
+        WORKSPACE_DIR, 'global_normalized_people_access.tif')
+    pygeoprocessing.new_raster_from_base(
+        warped_pop_raster_path,
+        target_normalized_people_global_access_path, gdal.GDT_Float32,
+        [-1])
 
     task_graph.close()
     task_graph.join()
+
+    pygeoprocessing.stitch_rasters(
+        people_access_path_list,
+        ['near']*len(people_access_path),
+        target_people_global_access_path,
+        overlap_algorithm='etch')
+    pygeoprocessing.stitch_rasters(
+        normalized_people_access_path_list,
+        ['near']*len(normalized_people_access_path_list),
+        target_normalized_people_global_access_path,
+        overlap_algorithm='etch')
 
 
 def status_monitor(
