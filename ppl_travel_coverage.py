@@ -147,9 +147,14 @@ def main():
     """Entry point."""
     parser = argparse.ArgumentParser(description='People Travel Coverage')
     parser.add_argument(
-        'population_key', help='population ecoshard key to simulate')
+        '--population_key', required=True,
+        help='population ecoshard key to simulate')
     parser.add_argument(
-        'max_travel_time', type=float, help='travel time in minutes')
+        '--max_travel_time', required=True,
+        type=float, help='travel time in minutes')
+    parser.add_argument(
+        '--pixel_size_m', required=True,
+        type=float, help='pixel size in meters')
     parser.add_argument(
         '--countries', type=str, nargs='+',
         help='comma separated list of countries to simulate')
