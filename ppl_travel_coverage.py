@@ -295,6 +295,16 @@ def main():
         target_bounding_box[2] += target_bounding_box[2] % TARGET_CELL_LENGTH_M
         target_bounding_box[3] += target_bounding_box[3] % TARGET_CELL_LENGTH_M
         LOGGER.debug(f'projected country_bb: {target_bounding_box}')
+
+        country_geometry = country_feature.GetGeometryRef()
+        country_bb = [
+            country_geometry.GetEnvelope()[i] for i in [0, 2, 1, 3]]
+        print(country_bb)
+        transformbb = pygeoprocessing.transform_bounding_box(
+            country_bb, osr.SRS_WKT_WGS84_LAT_LONG,
+            world_eckert_iv_wkt, edge_samples=11)
+        print(f'transformbb: {transformbb}')
+
         return
         sinusoidal_friction_path = os.path.join(
             country_workspace, f'{country_name}_friction.tif')
