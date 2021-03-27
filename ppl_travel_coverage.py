@@ -616,7 +616,7 @@ def shortest_distances_worker(
             # doing i_core-i_offset and j_core-j_offset because those
             # do the offsets of the relative size of the array, not the
             # global extents
-            n_visited, population_reach, norm_population_reach = (
+            population_reach, norm_population_reach = (
                 shortest_distances.find_population_reach(
                     friction_array, population_array,
                     cell_length,
@@ -625,12 +625,6 @@ def shortest_distances_worker(
                     friction_array.shape[1],
                     friction_array.shape[0],
                     max_travel_time))
-            if n_visited == 0:
-                LOGGER.debug(
-                    f'no need to write an empty array skipping '
-                    f'{i_offset} {j_offset}')
-                start_complete_queue.put(1)
-                continue
             result_queue.put(
                 (i_offset, j_offset, population_reach, norm_population_reach))
     except Exception:

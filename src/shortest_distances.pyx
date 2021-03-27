@@ -116,7 +116,7 @@ def find_population_reach(
 
     cdef DistPriorityQueueType dist_queue
     cdef ValuePixelType pixel
-    cdef int n_visited, any_visited = 0
+    cdef int n_visited
     with nogil:
         for i_start in range(core_i, core_i+core_size_i):
             for j_start in range(core_j, core_j+core_size_j):
@@ -127,7 +127,6 @@ def find_population_reach(
                 pixel.i = i_start
                 pixel.j = j_start
                 dist_queue.push(pixel)
-                any_visited = 1
                 current_time[j_start, i_start] = 0
                 min_i = i_start
                 max_i = i_start
@@ -192,4 +191,4 @@ def find_population_reach(
                             norm_pop_coverage[j, i] += normalized_pop
                             # reset for next iteration
                             visited[j, i] = 0
-    return any_visited, pop_coverage, norm_pop_coverage
+    return pop_coverage, norm_pop_coverage
