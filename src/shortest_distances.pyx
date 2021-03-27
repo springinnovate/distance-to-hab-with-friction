@@ -31,7 +31,8 @@ cdef extern from "<queue>" namespace "std" nogil:
 
 # this is the class type that'll get stored in the priority queue
 cdef struct ValuePixelType:
-    double value  # pixel value
+    float t_time  # pixel value
+    float edge_weight  # pixel value
     int i  # pixel i coordinate in the raster
     int j  # pixel j coordinate in the raster
 
@@ -43,8 +44,10 @@ ctypedef priority_queue[
 # functor for priority queue of pixels
 cdef cppclass LessPixel nogil:
     bint get "operator()"(ValuePixelType& lhs, ValuePixelType& rhs):
-        if lhs.value < rhs.value:
+        if lhs.edge_weight < rhs.edge_weight:
             return 1
+        elif lhs.edge_weight == rhs.edge_weight:
+            return lhs.t_time < rhs.t_time
         return 0
 
 
@@ -122,7 +125,8 @@ def find_population_reach(
                 population_val = population_array[j_start, i_start]
                 if population_val <= 0:
                     continue
-                pixel.value = 0
+                pixel.t_time = 0
+                pixel.edge_weight = 0
                 pixel.i = i_start
                 pixel.j = j_start
                 dist_queue.push(pixel)
@@ -136,7 +140,7 @@ def find_population_reach(
                 while dist_queue.size() > 0:
                     pixel = dist_queue.top()
                     dist_queue.pop()
-                    c_time = pixel.value
+                    c_time = pixel.t_time
                     i = pixel.i
                     j = pixel.j
                     if c_time > current_time[j, i]:
@@ -166,14 +170,16 @@ def find_population_reach(
                         # the nodata value is undefined but will present as 0.
                         if frict_n <= 0:
                             continue
-                        n_time = c_time + frict_n*dist_edge[v]
+                        edge_weight = frict_n*dist_edge[v]
+                        n_time = c_time + edge_weight
                         if n_time > max_time:
                             continue
                         # if visited before and we got there faster, then skip
                         if n_time >= current_time[j_n, i_n]:
                             continue
                         current_time[j_n, i_n] = n_time
-                        pixel.value = n_time
+                        pixel.t_time = n_time
+                        pixel.edge_weight = edge_weight
                         pixel.i = i_n
                         pixel.j = j_n
                         dist_queue.push(pixel)
