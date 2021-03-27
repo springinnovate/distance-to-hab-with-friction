@@ -607,15 +607,6 @@ def shortest_distances_worker(
             win_xsize=i_size, win_ysize=j_size)
         pop_nodata_mask = numpy.isclose(
             population_array, population_nodata)
-        total_population = numpy.sum(population_array[~pop_nodata_mask])
-        # don't route population where there isn't any
-        if total_population < POPULATION_COUNT_CUTOFF:
-            LOGGER.debug(
-                f'skipping because {total_population} < '
-                f'{POPULATION_COUNT_CUTOFF}')
-            start_complete_queue.put(1)
-            continue
-
         population_array[pop_nodata_mask] = 0.0
 
         # doing i_core-i_offset and j_core-j_offset because those
