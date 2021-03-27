@@ -85,8 +85,8 @@ def find_population_reach(
 
     Returns:
         tuple:
-        (n_visited,
-         2D array of population reach of the same size as input arrays).
+        (2D array of population reach of the same size as input arrays,
+         2D array of normalized population reach of the same size as input arrays).
 
     """
     cdef int i, j
@@ -94,10 +94,8 @@ def find_population_reach(
         (n_rows, n_cols), dtype=numpy.float32)
     cdef numpy.ndarray[float, ndim=2] norm_pop_coverage = numpy.zeros(
         (n_rows, n_cols), dtype=numpy.float32)
-    cdef numpy.ndarray[numpy.npy_bool, ndim=2] visited = numpy.zeros(
-        (n_rows, n_cols), dtype=bool)
-    cdef numpy.ndarray[float, ndim=2] current_time = numpy.empty(
-        (n_rows, n_cols), dtype=numpy.float32)
+    cdef numpy.ndarray[float, ndim=2] current_time = numpy.full(
+        (n_rows, n_cols), numpy.inf, dtype=numpy.float32)
 
     cdef int *ioff = [1, 1, 0, -1, -1, -1, 0, 1]
     cdef int *joff = [0, 1, 1, 1, 0, -1, -1, -1]
@@ -140,7 +138,10 @@ def find_population_reach(
                     c_time = pixel.value
                     i = pixel.i
                     j = pixel.j
-                    visited[j, i] = True
+                    if c_time > current_time[j, i]:
+                        # this means another path already reached here that's
+                        # better
+                        continue
                     if i < min_i:
                         min_i = i
                     elif i > max_i:
@@ -168,12 +169,9 @@ def find_population_reach(
                         if n_time > max_time:
                             continue
                         # if visited before and we got there faster, then skip
-                        if visited[j_n, i_n] and n_time >= current_time[j_n, i_n]:
+                        if n_time >= current_time[j_n, i_n]:
                             continue
                         current_time[j_n, i_n] = n_time
-                        if n_time < current_time[j_n, i_n]:
-                            raise ValueError(
-                                f'just set {n_time} to {current_time[j_n, i_n]} but it did not go less')
                         pixel.value = n_time
                         pixel.i = i_n
                         pixel.j = j_n
@@ -181,14 +179,14 @@ def find_population_reach(
                 n_visited = 0
                 for i in range(min_i, max_i+1):
                     for j in range(min_j, max_j+1):
-                        if visited[j, i]:
+                        if current_time[j, i] < numpy.inf:
                             n_visited += 1
                             pop_coverage[j, i] += population_val
                 normalized_pop = population_val / float(n_visited)
                 for i in range(min_i, max_i+1):
                     for j in range(min_j, max_j+1):
-                        if visited[j, i]:
+                        if current_time[j, i] < numpy.inf:
                             norm_pop_coverage[j, i] += normalized_pop
                             # reset for next iteration
-                            visited[j, i] = 0
+                            current_time[j, i] = numpy.inf
     return pop_coverage, norm_pop_coverage
