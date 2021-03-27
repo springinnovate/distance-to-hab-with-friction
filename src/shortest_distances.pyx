@@ -168,10 +168,13 @@ def find_population_reach(
                         n_time = c_time + frict_n*dist_edge[v]
                         if n_time > max_time:
                             continue
-                        # if visted before and we got there faster, then skip
+                        # if visited before and we got there faster, then skip
                         if visited[j_n, i_n] and n_time >= current_time[j_n, i_n]:
                             continue
                         current_time[j_n, i_n] = n_time
+                        if n_time < current_time[j_n, i_n]:
+                            raise ValueError(
+                                f'just set {n_time} to {current_time[j_n, i_n]} but it did not go less')
                         pixel.value = n_time
                         pixel.i = i_n
                         pixel.j = j_n

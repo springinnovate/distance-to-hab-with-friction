@@ -460,102 +460,105 @@ def people_access(
         None.
 
     """
-    min_friction = get_min_nonzero_raster_value(friction_raster_path)
-    max_travel_distance_in_pixels = math.ceil(
-        1/min_friction*max_travel_time/TARGET_CELL_LENGTH_M)
+    try:
+        min_friction = get_min_nonzero_raster_value(friction_raster_path)
+        max_travel_distance_in_pixels = math.ceil(
+            1/min_friction*max_travel_time/TARGET_CELL_LENGTH_M)
 
-    LOGGER.debug(
-        f'min_friction: {min_friction}\n'
-        f'max_travel_time: {max_travel_time}\n'
-        f'max_travel_distance_in_pixels {max_travel_distance_in_pixels}')
+        LOGGER.debug(
+            f'min_friction: {min_friction}\n'
+            f'max_travel_time: {max_travel_time}\n'
+            f'max_travel_distance_in_pixels {max_travel_distance_in_pixels}')
 
-    pygeoprocessing.new_raster_from_base(
-        population_density_raster_path, target_people_access_path,
-        gdal.GDT_Float32, [-1])
-    pygeoprocessing.new_raster_from_base(
-        population_density_raster_path, target_normalized_people_access_path,
-        gdal.GDT_Float32, [-1])
+        pygeoprocessing.new_raster_from_base(
+            population_density_raster_path, target_people_access_path,
+            gdal.GDT_Float32, [-1])
+        pygeoprocessing.new_raster_from_base(
+            population_density_raster_path, target_normalized_people_access_path,
+            gdal.GDT_Float32, [-1])
 
-    friction_raster_info = pygeoprocessing.get_raster_info(
-        friction_raster_path)
-    raster_x_size, raster_y_size = friction_raster_info['raster_size']
+        friction_raster_info = pygeoprocessing.get_raster_info(
+            friction_raster_path)
+        raster_x_size, raster_y_size = friction_raster_info['raster_size']
 
-    start_complete_queue = queue.Queue()
-    status_monitor_thread = threading.Thread(
-        target=status_monitor,
-        args=(start_complete_queue, country_id))
-    status_monitor_thread.start()
+        start_complete_queue = queue.Queue()
+        status_monitor_thread = threading.Thread(
+            target=status_monitor,
+            args=(start_complete_queue, country_id))
+        status_monitor_thread.start()
 
-    shortest_distances_worker_thread_list = []
-    work_queue = queue.Queue()
+        shortest_distances_worker_thread_list = []
+        work_queue = queue.Queue()
 
-    result_queue = queue.Queue()
-    for _ in range(multiprocessing.cpu_count()):
-        shortest_distances_worker_thread = threading.Thread(
-            target=shortest_distances_worker,
+        result_queue = queue.Queue()
+        for _ in range(multiprocessing.cpu_count()):
+            shortest_distances_worker_thread = threading.Thread(
+                target=shortest_distances_worker,
+                args=(
+                    work_queue, result_queue, start_complete_queue,
+                    friction_raster_path,
+                    population_density_raster_path, max_travel_time))
+            shortest_distances_worker_thread.start()
+            shortest_distances_worker_thread_list.append(
+                shortest_distances_worker_thread)
+
+        access_raster_stitcher_thread = threading.Thread(
+            target=access_raster_stitcher,
             args=(
-                work_queue, result_queue, start_complete_queue,
-                friction_raster_path,
-                population_density_raster_path, max_travel_time))
-        shortest_distances_worker_thread.start()
-        shortest_distances_worker_thread_list.append(
-            shortest_distances_worker_thread)
+                result_queue, start_complete_queue,
+                habitat_raster_path,
+                target_people_access_path,
+                target_normalized_people_access_path))
+        access_raster_stitcher_thread.start()
 
-    access_raster_stitcher_thread = threading.Thread(
-        target=access_raster_stitcher,
-        args=(
-            result_queue, start_complete_queue,
-            habitat_raster_path,
-            target_people_access_path,
-            target_normalized_people_access_path))
-    access_raster_stitcher_thread.start()
-
-    n_window_x = math.ceil(raster_x_size / CORE_SIZE)
-    n_window_y = math.ceil(raster_y_size / CORE_SIZE)
-    n_windows = n_window_x * n_window_y
-    start_complete_queue.put(n_windows)
-    for window_i in range(n_window_x):
-        i_core = window_i * CORE_SIZE
-        i_offset = i_core - max_travel_distance_in_pixels
-        i_size = CORE_SIZE + 2*max_travel_distance_in_pixels
-        i_core_size = CORE_SIZE
-        if i_offset < 0:
-            # shrink the size by the left margin and clamp to 0
-            i_size += i_offset
-            i_offset = 0
-
-        if i_core+i_core_size >= raster_x_size:
-            i_core_size -= i_core+i_core_size - raster_x_size + 1
-        if i_offset+i_size >= raster_x_size:
-            i_size -= i_offset+i_size - raster_x_size + 1
-
-        for window_j in range(n_window_y):
-            j_core = window_j * CORE_SIZE
-            j_offset = (
-                j_core - max_travel_distance_in_pixels)
-            j_size = CORE_SIZE + 2*max_travel_distance_in_pixels
-            j_core_size = CORE_SIZE
-            if j_offset < 0:
+        n_window_x = math.ceil(raster_x_size / CORE_SIZE)
+        n_window_y = math.ceil(raster_y_size / CORE_SIZE)
+        n_windows = n_window_x * n_window_y
+        start_complete_queue.put(n_windows)
+        for window_i in range(n_window_x):
+            i_core = window_i * CORE_SIZE
+            i_offset = i_core - max_travel_distance_in_pixels
+            i_size = CORE_SIZE + 2*max_travel_distance_in_pixels
+            i_core_size = CORE_SIZE
+            if i_offset < 0:
                 # shrink the size by the left margin and clamp to 0
-                j_size += j_offset
-                j_offset = 0
+                i_size += i_offset
+                i_offset = 0
 
-            if j_core+j_core_size >= raster_y_size:
-                j_core_size -= j_core+j_core_size - raster_y_size + 1
-            if j_offset+j_size >= raster_y_size:
-                j_size -= j_offset+j_size - raster_y_size + 1
+            if i_core+i_core_size >= raster_x_size:
+                i_core_size -= i_core+i_core_size - raster_x_size + 1
+            if i_offset+i_size >= raster_x_size:
+                i_size -= i_offset+i_size - raster_x_size + 1
 
-            work_queue.put(
-                (i_offset, j_offset, i_size, j_size, i_core, j_core,
-                 i_core_size, j_core_size))
+            for window_j in range(n_window_y):
+                j_core = window_j * CORE_SIZE
+                j_offset = (
+                    j_core - max_travel_distance_in_pixels)
+                j_size = CORE_SIZE + 2*max_travel_distance_in_pixels
+                j_core_size = CORE_SIZE
+                if j_offset < 0:
+                    # shrink the size by the left margin and clamp to 0
+                    j_size += j_offset
+                    j_offset = 0
 
-    work_queue.put(None)
-    for worker_thread in shortest_distances_worker_thread_list:
-        worker_thread.join()
-    LOGGER.info(f'done with workers')
-    result_queue.put(None)
-    access_raster_stitcher_thread.join()
-    LOGGER.info(f'done with access raster worker {target_people_access_path}')
+                if j_core+j_core_size >= raster_y_size:
+                    j_core_size -= j_core+j_core_size - raster_y_size + 1
+                if j_offset+j_size >= raster_y_size:
+                    j_size -= j_offset+j_size - raster_y_size + 1
+
+                work_queue.put(
+                    (i_offset, j_offset, i_size, j_size, i_core, j_core,
+                     i_core_size, j_core_size))
+
+        work_queue.put(None)
+        for worker_thread in shortest_distances_worker_thread_list:
+            worker_thread.join()
+        LOGGER.info(f'done with workers')
+        result_queue.put(None)
+        access_raster_stitcher_thread.join()
+        LOGGER.info(f'done with access raster worker {target_people_access_path}')
+    except Exception:
+        LOGGER.exception(f'something bad happened on people_access for {target_people_access_path}')
 
 
 def shortest_distances_worker(
@@ -580,55 +583,58 @@ def shortest_distances_worker(
     Return:
         ``None``
     """
-    friction_raster = gdal.OpenEx(friction_raster_path, gdal.OF_RASTER)
-    friction_band = friction_raster.GetRasterBand(1)
-    population_raster = gdal.OpenEx(
-        population_density_raster_path, gdal.OF_RASTER)
-    population_band = population_raster.GetRasterBand(1)
-    population_nodata = population_band.GetNoDataValue()
+    try:
+        friction_raster = gdal.OpenEx(friction_raster_path, gdal.OF_RASTER)
+        friction_band = friction_raster.GetRasterBand(1)
+        population_raster = gdal.OpenEx(
+            population_density_raster_path, gdal.OF_RASTER)
+        population_band = population_raster.GetRasterBand(1)
+        population_nodata = population_band.GetNoDataValue()
 
-    friction_raster_info = pygeoprocessing.get_raster_info(
-        friction_raster_path)
-    cell_length = friction_raster_info['pixel_size'][0]
-    raster_x_size, raster_y_size = friction_raster_info['raster_size']
+        friction_raster_info = pygeoprocessing.get_raster_info(
+            friction_raster_path)
+        cell_length = friction_raster_info['pixel_size'][0]
+        raster_x_size, raster_y_size = friction_raster_info['raster_size']
 
-    while True:
-        payload = work_queue.get()
-        if payload is None:
-            work_queue.put(None)
-            break
-        (i_offset, j_offset, i_size, j_size, i_core, j_core,
-         i_core_size, j_core_size) = payload
-        friction_array = friction_band.ReadAsArray(
-            xoff=i_offset, yoff=j_offset,
-            win_xsize=i_size, win_ysize=j_size)
-        population_array = population_band.ReadAsArray(
-            xoff=i_offset, yoff=j_offset,
-            win_xsize=i_size, win_ysize=j_size)
-        pop_nodata_mask = numpy.isclose(
-            population_array, population_nodata)
-        population_array[pop_nodata_mask] = 0.0
+        while True:
+            payload = work_queue.get()
+            if payload is None:
+                work_queue.put(None)
+                break
+            (i_offset, j_offset, i_size, j_size, i_core, j_core,
+             i_core_size, j_core_size) = payload
+            friction_array = friction_band.ReadAsArray(
+                xoff=i_offset, yoff=j_offset,
+                win_xsize=i_size, win_ysize=j_size)
+            population_array = population_band.ReadAsArray(
+                xoff=i_offset, yoff=j_offset,
+                win_xsize=i_size, win_ysize=j_size)
+            pop_nodata_mask = numpy.isclose(
+                population_array, population_nodata)
+            population_array[pop_nodata_mask] = 0.0
 
-        # doing i_core-i_offset and j_core-j_offset because those
-        # do the offsets of the relative size of the array, not the
-        # global extents
-        n_visited, population_reach, norm_population_reach = (
-            shortest_distances.find_population_reach(
-                friction_array, population_array,
-                cell_length,
-                i_core-i_offset, j_core-j_offset,
-                i_core_size, j_core_size,
-                friction_array.shape[1],
-                friction_array.shape[0],
-                max_travel_time))
-        if n_visited == 0:
-            LOGGER.debug(
-                f'no need to write an empty array skipping '
-                f'{i_offset} {j_offset}')
-            start_complete_queue.put(1)
-            continue
-        result_queue.put(
-            (i_offset, j_offset, population_reach, norm_population_reach))
+            # doing i_core-i_offset and j_core-j_offset because those
+            # do the offsets of the relative size of the array, not the
+            # global extents
+            n_visited, population_reach, norm_population_reach = (
+                shortest_distances.find_population_reach(
+                    friction_array, population_array,
+                    cell_length,
+                    i_core-i_offset, j_core-j_offset,
+                    i_core_size, j_core_size,
+                    friction_array.shape[1],
+                    friction_array.shape[0],
+                    max_travel_time))
+            if n_visited == 0:
+                LOGGER.debug(
+                    f'no need to write an empty array skipping '
+                    f'{i_offset} {j_offset}')
+                start_complete_queue.put(1)
+                continue
+            result_queue.put(
+                (i_offset, j_offset, population_reach, norm_population_reach))
+    except Exception:
+        LOGGER.exception(f'something bad happened on shortest_distances_worker {friction_raster_path}')
 
 
 def access_raster_stitcher(
