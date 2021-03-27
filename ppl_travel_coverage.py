@@ -44,7 +44,7 @@ POPULATION_COUNT_CUTOFF = 0
 TARGET_CELL_LENGTH_M = 2000
 TARGET_CELL_AREA_M2 = TARGET_CELL_LENGTH_M**2
 # maximum window size to process one set of travel times over
-CORE_SIZE = 256
+CORE_SIZE = 256 // 2**3
 
 logging.basicConfig(
     level=logging.DEBUG,
