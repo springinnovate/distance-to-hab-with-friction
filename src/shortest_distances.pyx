@@ -90,12 +90,13 @@ def find_population_reach(
 
     """
     cdef int i, j
+    cdef float inf = numpy.inf
     cdef numpy.ndarray[float, ndim=2] pop_coverage = numpy.zeros(
         (n_rows, n_cols), dtype=numpy.float32)
     cdef numpy.ndarray[float, ndim=2] norm_pop_coverage = numpy.zeros(
         (n_rows, n_cols), dtype=numpy.float32)
     cdef numpy.ndarray[float, ndim=2] current_time = numpy.full(
-        (n_rows, n_cols), numpy.inf, dtype=numpy.float32)
+        (n_rows, n_cols), inf, dtype=numpy.float32)
 
     cdef int *ioff = [1, 1, 0, -1, -1, -1, 0, 1]
     cdef int *joff = [0, 1, 1, 1, 0, -1, -1, -1]
@@ -179,14 +180,14 @@ def find_population_reach(
                 n_visited = 0
                 for i in range(min_i, max_i+1):
                     for j in range(min_j, max_j+1):
-                        if current_time[j, i] < numpy.inf:
+                        if current_time[j, i] < inf:
                             n_visited += 1
                             pop_coverage[j, i] += population_val
                 normalized_pop = population_val / float(n_visited)
                 for i in range(min_i, max_i+1):
                     for j in range(min_j, max_j+1):
-                        if current_time[j, i] < numpy.inf:
+                        if current_time[j, i] < inf:
                             norm_pop_coverage[j, i] += normalized_pop
                             # reset for next iteration
-                            current_time[j, i] = numpy.inf
+                            current_time[j, i] = inf
     return pop_coverage, norm_pop_coverage
