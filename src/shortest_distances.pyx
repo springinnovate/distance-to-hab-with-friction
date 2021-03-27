@@ -112,7 +112,7 @@ def find_population_reach(
         cell_length_m*2**0.5,
         cell_length_m,
         cell_length_m*2**0.5]
-    cdef float frict_n, c_time, n_time, normalized_pop, population_val
+    cdef float frict_n, c_time, n_time, edge_weight, normalized_pop, population_val
     cdef int i_start, j_start, i_n, j_n
     cdef int min_i, min_j, max_i, max_j
 
