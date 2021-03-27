@@ -681,7 +681,7 @@ def access_raster_stitcher(
 
             (i_offset, j_offset, population_reach, norm_population_reach) = payload
             j_size, i_size = population_reach.shape
-            LOGGER.info(f'got payload for {i_offset} {j_offset} {i_size} {j_size}')
+            #LOGGER.info(f'got payload for {i_offset} {j_offset} {i_size} {j_size}')
             current_pop_reach = people_access_band.ReadAsArray(
                 xoff=i_offset, yoff=j_offset,
                 win_xsize=i_size, win_ysize=j_size)
