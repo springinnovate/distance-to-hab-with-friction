@@ -96,6 +96,8 @@ def find_population_reach(
         (n_rows, n_cols), dtype=numpy.float32)
     cdef numpy.ndarray[numpy.npy_bool, ndim=2] visited = numpy.zeros(
         (n_rows, n_cols), dtype=bool)
+    cdef numpy.ndarray[float, ndim=2] current_time = numpy.empty(
+        (n_rows, n_cols), dtype=numpy.float32)
 
     cdef int *ioff = [1, 1, 0, -1, -1, -1, 0, 1]
     cdef int *joff = [0, 1, 1, 1, 0, -1, -1, -1]
@@ -126,6 +128,7 @@ def find_population_reach(
                 pixel.j = j_start
                 dist_queue.push(pixel)
                 any_visited = 1
+                current_time[j_start, i_start] = 0
                 min_i = i_start
                 max_i = i_start
                 min_j = j_start
@@ -155,8 +158,6 @@ def find_population_reach(
                             continue
                         if j_n < 0 or j_n >= n_rows:
                             continue
-                        if visited[j_n, i_n]:
-                            continue
                         if population_array[j_n, i_n] < 0:
                             # nodata, so skip
                             continue
@@ -165,11 +166,16 @@ def find_population_reach(
                         if frict_n <= 0:
                             continue
                         n_time = c_time + frict_n*dist_edge[v]
-                        if n_time <= max_time:
-                            pixel.value = n_time
-                            pixel.i = i_n
-                            pixel.j = j_n
-                            dist_queue.push(pixel)
+                        if n_time > max_time:
+                            continue
+                        # if visted before and we got there faster, then skip
+                        if visited[j_n, i_n] and n_time >= current_time[j_n, i_n]:
+                            continue
+                        current_time[j_n, i_n] = n_time
+                        pixel.value = n_time
+                        pixel.i = i_n
+                        pixel.j = j_n
+                        dist_queue.push(pixel)
                 n_visited = 0
                 for i in range(min_i, max_i+1):
                     for j in range(min_j, max_j+1):
