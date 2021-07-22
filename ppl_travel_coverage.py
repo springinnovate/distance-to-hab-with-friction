@@ -300,7 +300,7 @@ def main():
             func=pygeoprocessing.align_and_resize_raster_stack,
             args=(
                 base_raster_path_list, sinusoidal_raster_path_list,
-                ['near']*len(base_raster_path_list),
+                ['average']*len(base_raster_path_list),
                 (TARGET_CELL_LENGTH_M, -TARGET_CELL_LENGTH_M),
                 target_bounding_box),
             kwargs={
@@ -344,7 +344,7 @@ def main():
         args=(
             ecoshard_path_map[population_key],
             (TARGET_CELL_LENGTH_M, -TARGET_CELL_LENGTH_M),
-            warped_pop_raster_path, 'near'),
+            warped_pop_raster_path, 'average'),
         kwargs={
             'target_projection_wkt': world_eckert_iv_wkt,
             'target_bb': [
@@ -370,7 +370,7 @@ def main():
 
     pygeoprocessing.stitch_rasters(
         people_access_path_list,
-        ['near']*len(people_access_path_list),
+        ['average']*len(people_access_path_list),
         (target_people_global_access_path, 1),
         overlap_algorithm='etch')
     people_global_access_raster = gdal.OpenEx(
@@ -380,7 +380,7 @@ def main():
     people_global_access_band = None
     pygeoprocessing.stitch_rasters(
         normalized_people_access_path_list,
-        ['near']*len(normalized_people_access_path_list),
+        ['average']*len(normalized_people_access_path_list),
         (target_normalized_people_global_access_path, 1),
         overlap_algorithm='etch')
     normalized_people_global_access_raster = gdal.OpenEx(
