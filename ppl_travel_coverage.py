@@ -300,7 +300,7 @@ def main():
             func=pygeoprocessing.align_and_resize_raster_stack,
             args=(
                 base_raster_path_list, sinusoidal_raster_path_list,
-                ['average']*len(base_raster_path_list),
+                ['average', 'average', 'max'],
                 (TARGET_CELL_LENGTH_M, -TARGET_CELL_LENGTH_M),
                 target_bounding_box),
             kwargs={
