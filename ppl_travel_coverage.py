@@ -9,8 +9,8 @@ import sys
 import threading
 import time
 
-import pygeoprocessing
-from pygeoprocessing.geoprocessing import _create_latitude_m2_area_column
+import ecoshard.geoprocessing
+from ecoshard.geoprocessing.geoprocessing import _create_latitude_m2_area_column
 import numpy
 from osgeo import gdal
 import ecoshard
@@ -26,7 +26,7 @@ RASTER_ECOSHARD_URL_MAP = {
     'population_2017': 'https://storage.googleapis.com/ecoshard-root/population/lspop2017_md5_2e8da6824e4d67f8ea321ba4b585a3a5.tif',
     'lspop_2017_URCA_rural': 'https://storage.googleapis.com/ecoshard-root/population/lspop_2017_URCA_rural_md5_fe4ca0be95aa87a5e0ee6d7db83c0935.tif',
     'lspop_2017_URCA_urban': 'https://storage.googleapis.com/ecoshard-root/population/lspop_2017_URCA_urban_md5_ca344c73dfb71902ab99b4dca2a4a9fc.tif',
-    'habitat_mask': 'https://storage.googleapis.com/critical-natural-capital-ecoshards/habmasks/masked_all_nathab_wstreams_esa2015_nodata_md5_ee40334f1fc77bb1804d462c07261c86.tif',
+    #'habitat_mask': 'https://storage.googleapis.com/critical-natural-capital-ecoshards/habmasks/masked_all_nathab_wstreams_esa2015_nodata_md5_ee40334f1fc77bb1804d462c07261c86.tif',
     'world_borders': 'https://storage.googleapis.com/ecoshard-root/critical_natural_capital/TM_WORLD_BORDERS-0.3_simplified_md5_47f2059be8d4016072aa6abe77762021.gpkg',
 }
 
@@ -111,7 +111,7 @@ def create_population_density(
     Return:
         ``None``
     """
-    base_raster_info = pygeoprocessing.get_raster_info(
+    base_raster_info = ecoshard.geoprocessing.get_raster_info(
         wgs84_base_population_count_raster_path)
     _, lat_min, _, lat_max = base_raster_info['bounding_box']
     n_rows = base_raster_info['raster_size'][1]
@@ -136,7 +136,7 @@ def create_population_density(
     # multiply the pixels in the resampled raster by the ratio of
     # the pixel area in the wgs84 units divided by the area of the
     # original pixel
-    pygeoprocessing.raster_calculator(
+    ecoshard.geoprocessing.raster_calculator(
         [(wgs84_base_population_count_raster_path, 1),
          m2_area_per_lat], _div_op,
         target_population_density_raster_path,
@@ -263,7 +263,7 @@ def main():
         base_raster_path_list = [
             ecoshard_path_map['friction_surface'],
             ecoshard_path_map[population_key],
-            ecoshard_path_map['habitat_mask'],
+            #ecoshard_path_map['habitat_mask'],
         ]
 
         # swizzle so it's xmin, ymin, xmax, ymax
@@ -275,7 +275,7 @@ def main():
 
         # make sure the bounding coordinates snap to pixel grid in global coords
         LOGGER.debug(f'lat/lng country_bb: {country_bb}')
-        target_bounding_box = pygeoprocessing.transform_bounding_box(
+        target_bounding_box = ecoshard.geoprocessing.transform_bounding_box(
             country_bb, world_borders_layer.GetSpatialRef().ExportToWkt(),
             target_wkt, edge_samples=11)
         # make sure the bounding coordinates snap to pixel grid
@@ -290,17 +290,19 @@ def main():
         sinusoidal_population_path = os.path.join(
             country_workspace,
             f'{country_name}_population_{population_key}.tif')
-        sinusoidal_hab_path = os.path.join(
-            country_workspace, f'sinusoidal_{country_name}_hab.tif')
+        #sinusoidal_hab_path = os.path.join(
+        #    country_workspace, f'sinusoidal_{country_name}_hab.tif')
         sinusoidal_raster_path_list = [
-            sinusoidal_friction_path, sinusoidal_population_path,
-            sinusoidal_hab_path]
+            sinusoidal_friction_path,
+            sinusoidal_population_path,
+            #sinusoidal_hab_path,
+            ]
 
         projection_task = task_graph.add_task(
-            func=pygeoprocessing.align_and_resize_raster_stack,
+            func=ecoshard.geoprocessing.align_and_resize_raster_stack,
             args=(
                 base_raster_path_list, sinusoidal_raster_path_list,
-                ['average', 'average', 'max'],
+                ['average', 'average'],
                 (TARGET_CELL_LENGTH_M, -TARGET_CELL_LENGTH_M),
                 target_bounding_box),
             kwargs={
@@ -324,7 +326,8 @@ def main():
             args=(
                 country_name,
                 sinusoidal_friction_path, sinusoidal_population_path,
-                sinusoidal_hab_path, max_travel_time,
+                #sinusoidal_hab_path,
+                max_travel_time,
                 people_access_path,
                 normalized_people_access_path),
             target_path_list=[
@@ -340,7 +343,7 @@ def main():
     warped_pop_raster_path = os.path.join(
         WORKSPACE_DIR, f"warped_{os.path.basename(ecoshard_path_map[population_key])}")
     _ = task_graph.add_task(
-        func=pygeoprocessing.warp_raster,
+        func=ecoshard.geoprocessing.warp_raster,
         args=(
             ecoshard_path_map[population_key],
             (TARGET_CELL_LENGTH_M, -TARGET_CELL_LENGTH_M),
@@ -358,17 +361,17 @@ def main():
     # create access and normalized access paths
     target_people_global_access_path = os.path.join(
         WORKSPACE_DIR, f'global_people_access_{population_key}_{max_travel_time}m.tif')
-    pygeoprocessing.new_raster_from_base(
+    ecoshard.geoprocessing.new_raster_from_base(
         warped_pop_raster_path, target_people_global_access_path,
         gdal.GDT_Float32, [-1])
     target_normalized_people_global_access_path = os.path.join(
         WORKSPACE_DIR, f'global_normalized_people_access_{population_key}_{max_travel_time}m.tif')
-    pygeoprocessing.new_raster_from_base(
+    ecoshard.geoprocessing.new_raster_from_base(
         warped_pop_raster_path,
         target_normalized_people_global_access_path, gdal.GDT_Float32,
         [-1])
 
-    pygeoprocessing.stitch_rasters(
+    ecoshard.geoprocessing.stitch_rasters(
         people_access_path_list,
         ['average']*len(people_access_path_list),
         (target_people_global_access_path, 1),
@@ -378,7 +381,7 @@ def main():
     people_global_access_band = people_global_access_raster.GetRasterBand(1)
     people_global_access_band.ComputeStatistics(0)
     people_global_access_band = None
-    pygeoprocessing.stitch_rasters(
+    ecoshard.geoprocessing.stitch_rasters(
         normalized_people_access_path_list,
         ['average']*len(normalized_people_access_path_list),
         (target_normalized_people_global_access_path, 1),
@@ -429,7 +432,8 @@ def status_monitor(
 
 def people_access(
         country_id, friction_raster_path, population_density_raster_path,
-        habitat_raster_path, max_travel_time, target_people_access_path,
+        #habitat_raster_path,
+        max_travel_time, target_people_access_path,
         target_normalized_people_access_path):
     """Construct a people access raster showing where people can reach.
 
@@ -471,14 +475,14 @@ def people_access(
             f'max_travel_time: {max_travel_time}\n'
             f'max_travel_distance_in_pixels {max_travel_distance_in_pixels}')
 
-        pygeoprocessing.new_raster_from_base(
+        ecoshard.geoprocessing.new_raster_from_base(
             population_density_raster_path, target_people_access_path,
             gdal.GDT_Float32, [-1])
-        pygeoprocessing.new_raster_from_base(
+        ecoshard.geoprocessing.new_raster_from_base(
             population_density_raster_path, target_normalized_people_access_path,
             gdal.GDT_Float32, [-1])
 
-        friction_raster_info = pygeoprocessing.get_raster_info(
+        friction_raster_info = ecoshard.geoprocessing.get_raster_info(
             friction_raster_path)
         raster_x_size, raster_y_size = friction_raster_info['raster_size']
 
@@ -507,7 +511,7 @@ def people_access(
             target=access_raster_stitcher,
             args=(
                 result_queue, start_complete_queue,
-                habitat_raster_path,
+                #habitat_raster_path,
                 target_people_access_path,
                 target_normalized_people_access_path))
         access_raster_stitcher_thread.start()
@@ -592,7 +596,7 @@ def shortest_distances_worker(
         population_band = population_raster.GetRasterBand(1)
         population_nodata = population_band.GetNoDataValue()
 
-        friction_raster_info = pygeoprocessing.get_raster_info(
+        friction_raster_info = ecoshard.geoprocessing.get_raster_info(
             friction_raster_path)
         cell_length = friction_raster_info['pixel_size'][0]
         raster_x_size, raster_y_size = friction_raster_info['raster_size']
@@ -634,7 +638,8 @@ def shortest_distances_worker(
 
 def access_raster_stitcher(
         work_queue, start_complete_queue,
-        habitat_raster_path, target_people_access_path,
+        # habitat_raster_path,
+        target_people_access_path,
         target_normalized_people_access_path):
     """Write arrays from the work queue as they come in.
 
@@ -661,9 +666,9 @@ def access_raster_stitcher(
         ``None``
     """
     try:
-        habitat_raster = gdal.OpenEx(
-            habitat_raster_path, gdal.OF_RASTER)
-        habitat_band = habitat_raster.GetRasterBand(1)
+        #habitat_raster = gdal.OpenEx(
+        #    habitat_raster_path, gdal.OF_RASTER)
+        #habitat_band = habitat_raster.GetRasterBand(1)
         people_access_raster = gdal.OpenEx(
             target_people_access_path, gdal.OF_RASTER | gdal.GA_Update)
         people_access_band = people_access_raster.GetRasterBand(1)
@@ -686,12 +691,12 @@ def access_raster_stitcher(
             current_pop_reach = people_access_band.ReadAsArray(
                 xoff=i_offset, yoff=j_offset,
                 win_xsize=i_size, win_ysize=j_size)
-            habitat_array = habitat_band.ReadAsArray(
-                xoff=i_offset, yoff=j_offset,
-                win_xsize=i_size, win_ysize=j_size)
-            valid_mask = habitat_array == 1
-            current_pop_reach[(current_pop_reach == -1) & valid_mask] = 0
-            current_pop_reach[valid_mask] += population_reach[valid_mask] * (
+            #habitat_array = habitat_band.ReadAsArray(
+            #    xoff=i_offset, yoff=j_offset,
+            #    win_xsize=i_size, win_ysize=j_size)
+            #valid_mask = habitat_array == 1
+            current_pop_reach[(current_pop_reach == -1)] = 0
+            current_pop_reach[:] += population_reach * (
                 TARGET_CELL_AREA_M2)
             people_access_band.WriteArray(
                 current_pop_reach, xoff=i_offset, yoff=j_offset)
@@ -701,9 +706,9 @@ def access_raster_stitcher(
                     xoff=i_offset, yoff=j_offset,
                     win_xsize=i_size, win_ysize=j_size))
             current_norm_pop_reach[
-                (current_norm_pop_reach == -1) & valid_mask] = 0
-            current_norm_pop_reach[valid_mask] += (
-                norm_population_reach[valid_mask] * TARGET_CELL_AREA_M2)
+                (current_norm_pop_reach == -1)] = 0
+            current_norm_pop_reach[:] += (
+                norm_population_reach * TARGET_CELL_AREA_M2)
             normalized_people_access_band.WriteArray(
                 current_norm_pop_reach, xoff=i_offset, yoff=j_offset)
             start_complete_queue.put(1)
