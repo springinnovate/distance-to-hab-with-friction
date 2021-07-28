@@ -54,7 +54,7 @@ logging.basicConfig(
     stream=sys.stdout)
 LOGGER = logging.getLogger(__name__)
 logging.getLogger().addHandler(logging.FileHandler('log.txt'))
-logging.getLogger('taskgraph').setLevel(logging.ERROR)
+logging.getLogger('taskgraph').setLevel(logging.DEBUG)
 
 SKIP_THESE_COUNTRIES = [
     'Anguilla',
@@ -263,7 +263,6 @@ def main():
         base_raster_path_list = [
             ecoshard_path_map['friction_surface'],
             ecoshard_path_map[population_key],
-            #ecoshard_path_map['habitat_mask'],
         ]
 
         # swizzle so it's xmin, ymin, xmax, ymax
@@ -288,52 +287,57 @@ def main():
         sinusoidal_friction_path = os.path.join(
             country_workspace, f'{country_name}_friction.tif')
         sinusoidal_population_path = os.path.join(
-            country_workspace,
-            f'{country_name}_population_{population_key}.tif')
-        #sinusoidal_hab_path = os.path.join(
-        #    country_workspace, f'sinusoidal_{country_name}_hab.tif')
+            country_workspace, f'{country_name}_{population_key}_population.tif')
         sinusoidal_raster_path_list = [
             sinusoidal_friction_path,
             sinusoidal_population_path,
-            #sinusoidal_hab_path,
             ]
 
-        projection_task = task_graph.add_task(
-            func=ecoshard.geoprocessing.align_and_resize_raster_stack,
-            args=(
-                base_raster_path_list, sinusoidal_raster_path_list,
-                ['average', 'average'],
-                (TARGET_CELL_LENGTH_M, -TARGET_CELL_LENGTH_M),
-                target_bounding_box),
-            kwargs={
-                'target_projection_wkt': world_eckert_iv_wkt,
-                'vector_mask_options': {
-                    'mask_vector_path': ecoshard_path_map['world_borders'],
-                    'mask_vector_where_filter': f'"fid"={country_fid}'
-                }
-            },
-            target_path_list=sinusoidal_raster_path_list,
-            task_name=f'project and clip rasters for {country_name}')
+        align_precalcualted = all(
+            [os.path.exists(path) for path in sinusoidal_raster_path_list])
+        projection_task_list = []
+        if not align_precalcualted:
+            projection_task = task_graph.add_task(
+                func=ecoshard.geoprocessing.align_and_resize_raster_stack,
+                args=(
+                    base_raster_path_list, sinusoidal_raster_path_list,
+                    ['average', 'average'],
+                    (TARGET_CELL_LENGTH_M, -TARGET_CELL_LENGTH_M),
+                    target_bounding_box),
+                kwargs={
+                    'target_projection_wkt': world_eckert_iv_wkt,
+                    'vector_mask_options': {
+                        'mask_vector_path': ecoshard_path_map['world_borders'],
+                        'mask_vector_where_filter': f'"fid"={country_fid}'
+                    }
+                },
+                ignore_path_list=[ecoshard_path_map['world_borders']],
+                target_path_list=sinusoidal_raster_path_list,
+                task_name=f'project and clip rasters for {country_name}')
+            projection_task_list.append(projection_task)
 
         people_access_path = os.path.join(
             country_workspace,
-            f'people_access_{country_name}_{population_key}_{max_travel_time}m.tif')
+            f'people_access_{country_name}_{population_key}_'
+            f'{max_travel_time}m.tif')
         normalized_people_access_path = os.path.join(
-            country_workspace, f'norm_people_access_{country_name}_{max_travel_time}m.tif')
+            country_workspace, f'norm_people_access_{country_name}_{population_key}_{max_travel_time}m.tif')
 
-        _ = task_graph.add_task(
+        people_access_task = task_graph.add_task(
             func=people_access,
             args=(
                 country_name,
                 sinusoidal_friction_path, sinusoidal_population_path,
-                #sinusoidal_hab_path,
                 max_travel_time,
                 people_access_path,
                 normalized_people_access_path),
             target_path_list=[
                 people_access_path, normalized_people_access_path],
-            dependent_task_list=[projection_task],
+            dependent_task_list=projection_task_list,
             task_name='calculating people access for %s' % country_name)
+        people_access_task.is_precalculated()
+        LOGGER.debug(f'PEOPLE ACCESS::: {people_access_task}')
+
         people_access_path_list.append((people_access_path, 1))
         normalized_people_access_path_list.append(
             (normalized_people_access_path, 1))
@@ -432,7 +436,6 @@ def status_monitor(
 
 def people_access(
         country_id, friction_raster_path, population_density_raster_path,
-        #habitat_raster_path,
         max_travel_time, target_people_access_path,
         target_normalized_people_access_path):
     """Construct a people access raster showing where people can reach.
@@ -631,14 +634,13 @@ def shortest_distances_worker(
                     friction_array.shape[0],
                     max_travel_time))
             result_queue.put(
-                (i_offset, j_offset, population_reach, norm_population_reach))
+                (i_offset, j_offset, population_reach, norm_population_reach, pop_nodata_mask))
     except Exception:
         LOGGER.exception(f'something bad happened on shortest_distances_worker {friction_raster_path}')
 
 
 def access_raster_stitcher(
         work_queue, start_complete_queue,
-        # habitat_raster_path,
         target_people_access_path,
         target_normalized_people_access_path):
     """Write arrays from the work queue as they come in.
@@ -648,8 +650,6 @@ def access_raster_stitcher(
             (n_valid, i_offset, j_offset, people_access,
              normalized_people_access)
         start_complete_queue (queue): put a 1 in here for each block complete
-        habitat_raster_path (str): path to habitat layer used to determine
-            where to mask by habitat.
         target_people_access_path (str): raster created that
             will contain the count of population that can reach any given
             pixel within the travel time and travel distance constraints.
@@ -666,9 +666,6 @@ def access_raster_stitcher(
         ``None``
     """
     try:
-        #habitat_raster = gdal.OpenEx(
-        #    habitat_raster_path, gdal.OF_RASTER)
-        #habitat_band = habitat_raster.GetRasterBand(1)
         people_access_raster = gdal.OpenEx(
             target_people_access_path, gdal.OF_RASTER | gdal.GA_Update)
         people_access_band = people_access_raster.GetRasterBand(1)
@@ -685,19 +682,14 @@ def access_raster_stitcher(
                     f'{target_normalized_people_access_path}')
                 break
 
-            (i_offset, j_offset, population_reach, norm_population_reach) = payload
+            (i_offset, j_offset, population_reach, norm_population_reach, pop_nodata_mask) = payload
             j_size, i_size = population_reach.shape
-            #LOGGER.info(f'got payload for {i_offset} {j_offset} {i_size} {j_size}')
             current_pop_reach = people_access_band.ReadAsArray(
                 xoff=i_offset, yoff=j_offset,
                 win_xsize=i_size, win_ysize=j_size)
-            #habitat_array = habitat_band.ReadAsArray(
-            #    xoff=i_offset, yoff=j_offset,
-            #    win_xsize=i_size, win_ysize=j_size)
-            #valid_mask = habitat_array == 1
-            current_pop_reach[(current_pop_reach == -1)] = 0
-            current_pop_reach[:] += population_reach * (
-                TARGET_CELL_AREA_M2)
+            current_pop_reach[(current_pop_reach == -1) & (~pop_nodata_mask)] = 0
+            current_pop_reach[~pop_nodata_mask] += \
+                population_reach[~pop_nodata_mask] * (TARGET_CELL_AREA_M2)
             people_access_band.WriteArray(
                 current_pop_reach, xoff=i_offset, yoff=j_offset)
 
@@ -705,10 +697,9 @@ def access_raster_stitcher(
                 normalized_people_access_band.ReadAsArray(
                     xoff=i_offset, yoff=j_offset,
                     win_xsize=i_size, win_ysize=j_size))
-            current_norm_pop_reach[
-                (current_norm_pop_reach == -1)] = 0
-            current_norm_pop_reach[:] += (
-                norm_population_reach * TARGET_CELL_AREA_M2)
+            current_norm_pop_reach[(current_norm_pop_reach == -1) & (~pop_nodata_mask)] = 0
+            current_norm_pop_reach[~pop_nodata_mask] += (
+                norm_population_reach[~pop_nodata_mask] * TARGET_CELL_AREA_M2)
             normalized_people_access_band.WriteArray(
                 current_norm_pop_reach, xoff=i_offset, yoff=j_offset)
             start_complete_queue.put(1)
