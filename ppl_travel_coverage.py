@@ -153,9 +153,6 @@ def main():
         '--max_travel_time', required=True,
         type=float, help='travel time in minutes')
     parser.add_argument(
-        '--pixel_size_m', required=True,
-        type=float, help='pixel size in meters')
-    parser.add_argument(
         '--countries', type=str, nargs='+',
         help='comma separated list of countries to simulate')
     args = parser.parse_args()
