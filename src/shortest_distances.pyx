@@ -250,7 +250,7 @@ def find_mask_reach(
     cdef float frict_n, c_time, n_time, edge_weight
     cdef int i_start, j_start, i_n, j_n
     cdef int min_i, min_j, max_i, max_j
-    cdef int mask_val, mask_val_count=0
+    cdef int mask_val
 
     cdef DistPriorityQueueType dist_queue
     cdef ValuePixelType pixel
@@ -261,10 +261,7 @@ def find_mask_reach(
                 mask_val = mask_array[j_start, i_start]
                 if mask_val != 1:
                     continue
-                # TODO: DEBUGGING
-                #printf('%d, %d\n', j_start, i_start)
                 mask_coverage[j_start, i_start] = 1
-                mask_val_count += 1
 
                 pixel.t_time = 0
                 pixel.edge_weight = 0
@@ -330,4 +327,4 @@ def find_mask_reach(
                     for j in range(min_j, max_j+1):
                         # reset for next iteration
                         current_time[j, i] = inf
-    return mask_coverage, mask_val_count
+    return mask_coverage

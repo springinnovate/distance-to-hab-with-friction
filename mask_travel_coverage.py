@@ -218,7 +218,7 @@ def mask_access(
         work_queue = queue.Queue()
 
         result_queue = queue.Queue()
-        for _ in range(1): #multiprocessing.cpu_count()):
+        for _ in range(multiprocessing.cpu_count()):
             shortest_distances_worker_thread = threading.Thread(
                 target=shortest_distances_worker,
                 args=(
@@ -315,7 +315,6 @@ def shortest_distances_worker(
         friction_band = friction_raster.GetRasterBand(1)
         mask_raster = gdal.OpenEx(mask_raster_path, gdal.OF_RASTER)
         mask_band = mask_raster.GetRasterBand(1)
-        mask_nodata = mask_band.GetNoDataValue()
 
         friction_raster_info = ecoshard.geoprocessing.get_raster_info(
             friction_raster_path)
@@ -335,10 +334,8 @@ def shortest_distances_worker(
             mask_array = mask_band.ReadAsArray(
                 xoff=i_offset, yoff=j_offset,
                 win_xsize=i_size, win_ysize=j_size)
-            mask_nodata_mask = numpy.zeros(mask_array.shape, dtype=bool) #numpy.isclose(mask_array, mask_nodata)
             # convert it to a byte and drop all the nodata info
             mask_array = (mask_array == 1).astype(numpy.int8)
-            #mask_array[mask_nodata_mask] = 0.0
 
             # doing i_core-i_offset and j_core-j_offset because those
             # do the offsets of the relative size of the array, not the
@@ -352,9 +349,7 @@ def shortest_distances_worker(
                     friction_array.shape[1],
                     friction_array.shape[0],
                     max_travel_time))
-            #LOGGER.debug(f'{mask_count} elements seen but \t{numpy.count_nonzero(mask_reach)} elements are in result {i_offset}, {j_offset}')
-            result_queue.put(
-                (i_offset, j_offset, mask_reach, mask_nodata_mask))
+            result_queue.put((i_offset, j_offset, mask_reach))
     except Exception:
         LOGGER.exception(
             f'something bad happened on shortest_distances_worker '
@@ -382,49 +377,25 @@ def access_raster_stitcher(
         mask_access_raster = gdal.OpenEx(
             target_mask_access_path, gdal.OF_RASTER | gdal.GA_Update)
         mask_access_band = mask_access_raster.GetRasterBand(1)
-        mask_access_nodata = mask_access_band.GetNoDataValue()
         while True:
-            if (mask_access_band.ReadAsArray()==1).any():
-                LOGGER.info(f'PRE got some ones in the band')
-            else:
-                LOGGER.info('PRE there are NO 1s in mask access band')
             payload = work_queue.get()
             if payload is None:
                 LOGGER.info(
                     f'all dones stitching {target_mask_access_path}')
-
-                if (mask_access_band.ReadAsArray()==1).any():
-                    LOGGER.info(f'got some ones in the band')
-                else:
-                    LOGGER.info('there are NO 1s in mask access band')
                 break
 
-            (i_offset, j_offset, mask_reach, mask_nodata_mask) = payload
+            (i_offset, j_offset, mask_reach) = payload
             j_size, i_size = mask_reach.shape
             current_mask_reach = mask_access_band.ReadAsArray(
                 xoff=i_offset, yoff=j_offset,
                 win_xsize=i_size, win_ysize=j_size)
             current_mask_reach[mask_reach == 1] = 1
-            #current_mask_reach[
-            #    (current_mask_reach == mask_access_nodata) & (~mask_nodata_mask)] = 0
-            #current_mask_reach[~mask_nodata_mask] = \
-            #    mask_reach[~mask_nodata_mask]
             mask_access_band.WriteArray(
                 current_mask_reach, xoff=i_offset, yoff=j_offset)
             LOGGER.debug(mask_reach.size)
-            #test_array = mask_access_band.ReadAsArray(
-            #    xoff=i_offset, yoff=j_offset,
-            #    win_xsize=i_size, win_ysize=j_size)
-
-            #LOGGER.debug(f'stitching {i_offset} {j_offset} with {numpy.count_nonzero(current_mask_reach)} 1s to {target_mask_access_path}')
 
             start_complete_queue.put(1)
             time.sleep(0.001)
-
-        if (mask_access_band.ReadAsArray()==1).any():
-            LOGGER.info(f'got some ones in the band')
-        else:
-            LOGGER.info('there are NO 1s in mask access band')
 
         LOGGER.info(
             f'set access rasters to none for {target_mask_access_path}')
