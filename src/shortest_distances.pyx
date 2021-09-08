@@ -12,6 +12,7 @@ import numpy
 
 cimport cython
 cimport numpy
+from libc.stdio cimport printf
 from libc.time cimport time as ctime
 from libc.time cimport time_t
 from libcpp.deque cimport deque
@@ -204,7 +205,7 @@ def find_population_reach(
 @cython.cdivision(True)
 def find_mask_reach(
         numpy.ndarray[float, ndim=2] friction_array,
-        numpy.ndarray[byte, ndim=2] mask_array,
+        numpy.ndarray[numpy.int8_t, ndim=2] mask_array,
         double cell_length_m, int core_i, int core_j,
         int core_size_i, int core_size_j,
         int n_cols, int n_rows,
@@ -230,8 +231,8 @@ def find_mask_reach(
     """
     cdef int i, j
     cdef float inf = numpy.inf
-    cdef numpy.ndarray[float, ndim=2] mask_coverage = numpy.zeros(
-        (n_rows, n_cols), dtype=numpy.int8)
+    cdef numpy.ndarray[numpy.uint8_t, ndim=2] mask_coverage = numpy.zeros(
+        (n_rows, n_cols), dtype=numpy.uint8)
     cdef numpy.ndarray[float, ndim=2] current_time = numpy.full(
         (n_rows, n_cols), inf, dtype=numpy.float32)
 
@@ -246,9 +247,10 @@ def find_mask_reach(
         cell_length_m*2**0.5,
         cell_length_m,
         cell_length_m*2**0.5]
-    cdef float frict_n, c_time, n_time, edge_weight, mask_val
+    cdef float frict_n, c_time, n_time, edge_weight
     cdef int i_start, j_start, i_n, j_n
     cdef int min_i, min_j, max_i, max_j
+    cdef int mask_val, mask_val_count=0
 
     cdef DistPriorityQueueType dist_queue
     cdef ValuePixelType pixel
@@ -257,8 +259,13 @@ def find_mask_reach(
         for i_start in range(core_i, core_i+core_size_i):
             for j_start in range(core_j, core_j+core_size_j):
                 mask_val = mask_array[j_start, i_start]
-                if mask_val == 0:
+                if mask_val != 1:
                     continue
+                # TODO: DEBUGGING
+                #printf('%d, %d\n', j_start, i_start)
+                mask_coverage[j_start, i_start] = 1
+                mask_val_count += 1
+
                 pixel.t_time = 0
                 pixel.edge_weight = 0
                 pixel.i = i_start
@@ -281,6 +288,7 @@ def find_mask_reach(
                         # this means another path already reached here that's
                         # better
                         continue
+                    mask_coverage[j, i] = 1
                     if i < min_i:
                         min_i = i
                     elif i > max_i:
@@ -320,9 +328,6 @@ def find_mask_reach(
                 n_visited = 0
                 for i in range(min_i, max_i+1):
                     for j in range(min_j, max_j+1):
-                        if current_time[j, i] < inf:
-                            n_visited += 1
-                            mask_coverage[j, i] = 1
-                            # reset for next iteration
-                            current_time[j, i] = inf
-    return mask_coverage
+                        # reset for next iteration
+                        current_time[j, i] = inf
+    return mask_coverage, mask_val_count

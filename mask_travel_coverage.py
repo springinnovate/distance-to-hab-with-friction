@@ -57,7 +57,7 @@ logging.basicConfig(
     stream=sys.stdout)
 LOGGER = logging.getLogger(__name__)
 logging.getLogger().addHandler(logging.FileHandler('log.txt'))
-logging.getLogger('taskgraph').setLevel(logging.DEBUG)
+logging.getLogger('taskgraph').setLevel(logging.WARN)
 
 SKIP_THESE_COUNTRIES = [
     'Anguilla',
@@ -218,7 +218,7 @@ def mask_access(
         work_queue = queue.Queue()
 
         result_queue = queue.Queue()
-        for _ in range(multiprocessing.cpu_count()):
+        for _ in range(1): #multiprocessing.cpu_count()):
             shortest_distances_worker_thread = threading.Thread(
                 target=shortest_distances_worker,
                 args=(
@@ -313,8 +313,7 @@ def shortest_distances_worker(
     try:
         friction_raster = gdal.OpenEx(friction_raster_path, gdal.OF_RASTER)
         friction_band = friction_raster.GetRasterBand(1)
-        mask_raster = gdal.OpenEx(
-            mask_raster_path, gdal.OF_RASTER)
+        mask_raster = gdal.OpenEx(mask_raster_path, gdal.OF_RASTER)
         mask_band = mask_raster.GetRasterBand(1)
         mask_nodata = mask_band.GetNoDataValue()
 
@@ -336,13 +335,15 @@ def shortest_distances_worker(
             mask_array = mask_band.ReadAsArray(
                 xoff=i_offset, yoff=j_offset,
                 win_xsize=i_size, win_ysize=j_size)
-            pop_nodata_mask = (mask_array == mask_nodata)
-            mask_array[pop_nodata_mask] = 0.0
+            mask_nodata_mask = numpy.zeros(mask_array.shape, dtype=bool) #numpy.isclose(mask_array, mask_nodata)
+            # convert it to a byte and drop all the nodata info
+            mask_array = (mask_array == 1).astype(numpy.int8)
+            #mask_array[mask_nodata_mask] = 0.0
 
             # doing i_core-i_offset and j_core-j_offset because those
             # do the offsets of the relative size of the array, not the
             # global extents
-            population_reach = (
+            mask_reach, mask_count = (
                 shortest_distances.find_mask_reach(
                     friction_array, mask_array,
                     cell_length,
@@ -351,8 +352,9 @@ def shortest_distances_worker(
                     friction_array.shape[1],
                     friction_array.shape[0],
                     max_travel_time))
+            #LOGGER.debug(f'{mask_count} elements seen but \t{numpy.count_nonzero(mask_reach)} elements are in result {i_offset}, {j_offset}')
             result_queue.put(
-                (i_offset, j_offset, population_reach, pop_nodata_mask))
+                (i_offset, j_offset, mask_reach, mask_nodata_mask))
     except Exception:
         LOGGER.exception(
             f'something bad happened on shortest_distances_worker '
@@ -380,11 +382,21 @@ def access_raster_stitcher(
         mask_access_raster = gdal.OpenEx(
             target_mask_access_path, gdal.OF_RASTER | gdal.GA_Update)
         mask_access_band = mask_access_raster.GetRasterBand(1)
+        mask_access_nodata = mask_access_band.GetNoDataValue()
         while True:
+            if (mask_access_band.ReadAsArray()==1).any():
+                LOGGER.info(f'PRE got some ones in the band')
+            else:
+                LOGGER.info('PRE there are NO 1s in mask access band')
             payload = work_queue.get()
             if payload is None:
                 LOGGER.info(
                     f'all dones stitching {target_mask_access_path}')
+
+                if (mask_access_band.ReadAsArray()==1).any():
+                    LOGGER.info(f'got some ones in the band')
+                else:
+                    LOGGER.info('there are NO 1s in mask access band')
                 break
 
             (i_offset, j_offset, mask_reach, mask_nodata_mask) = payload
@@ -392,23 +404,37 @@ def access_raster_stitcher(
             current_mask_reach = mask_access_band.ReadAsArray(
                 xoff=i_offset, yoff=j_offset,
                 win_xsize=i_size, win_ysize=j_size)
-            current_mask_reach[
-                (current_mask_reach == -1) & (~mask_nodata_mask)] = 0
-            current_mask_reach[~mask_nodata_mask] += \
-                mask_reach[~mask_nodata_mask] * (TARGET_CELL_AREA_M2)
+            current_mask_reach[mask_reach == 1] = 1
+            #current_mask_reach[
+            #    (current_mask_reach == mask_access_nodata) & (~mask_nodata_mask)] = 0
+            #current_mask_reach[~mask_nodata_mask] = \
+            #    mask_reach[~mask_nodata_mask]
             mask_access_band.WriteArray(
                 current_mask_reach, xoff=i_offset, yoff=j_offset)
+            LOGGER.debug(mask_reach.size)
+            #test_array = mask_access_band.ReadAsArray(
+            #    xoff=i_offset, yoff=j_offset,
+            #    win_xsize=i_size, win_ysize=j_size)
+
+            #LOGGER.debug(f'stitching {i_offset} {j_offset} with {numpy.count_nonzero(current_mask_reach)} 1s to {target_mask_access_path}')
 
             start_complete_queue.put(1)
+            time.sleep(0.001)
+
+        if (mask_access_band.ReadAsArray()==1).any():
+            LOGGER.info(f'got some ones in the band')
+        else:
+            LOGGER.info('there are NO 1s in mask access band')
 
         LOGGER.info(
             f'set access rasters to none for {target_mask_access_path}')
-        mask_access_raster = None
         mask_access_band = None
-        LOGGER.info(f'done writing to {target_mask_access_path}')
+        mask_access_raster = None
+
     except Exception:
         LOGGER.exception('something bad happened on access_raster_stitcher')
         raise
+    LOGGER.info(f'clean exit on {target_mask_access_path}')
 
 
 def main():
@@ -434,8 +460,10 @@ def main():
         CHURN_DIR, multiprocessing.cpu_count()//4, 5.0)
     ecoshard_path_map = {}
 
-    for ecoshard_id, ecoshard_url in (
-            RASTER_ECOSHARD_URL_MAP.items() | {MASK_KEY: args.mask}):
+    RASTER_ECOSHARD_URL_MAP.update({MASK_KEY: args.mask})
+    LOGGER.debug(RASTER_ECOSHARD_URL_MAP)
+
+    for ecoshard_id, ecoshard_url in RASTER_ECOSHARD_URL_MAP.items():
         ecoshard_path = os.path.join(
             ECOSHARD_DIR, os.path.basename(ecoshard_url))
         _ = task_graph.add_task(
