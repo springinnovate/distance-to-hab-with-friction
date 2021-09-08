@@ -340,15 +340,14 @@ def shortest_distances_worker(
             # doing i_core-i_offset and j_core-j_offset because those
             # do the offsets of the relative size of the array, not the
             # global extents
-            mask_reach, mask_count = (
-                shortest_distances.find_mask_reach(
-                    friction_array, mask_array,
-                    cell_length,
-                    i_core-i_offset, j_core-j_offset,
-                    i_core_size, j_core_size,
-                    friction_array.shape[1],
-                    friction_array.shape[0],
-                    max_travel_time))
+            mask_reach = shortest_distances.find_mask_reach(
+                friction_array, mask_array,
+                cell_length,
+                i_core-i_offset, j_core-j_offset,
+                i_core_size, j_core_size,
+                friction_array.shape[1],
+                friction_array.shape[0],
+                max_travel_time)
             result_queue.put((i_offset, j_offset, mask_reach))
     except Exception:
         LOGGER.exception(
@@ -392,7 +391,6 @@ def access_raster_stitcher(
             current_mask_reach[mask_reach == 1] = 1
             mask_access_band.WriteArray(
                 current_mask_reach, xoff=i_offset, yoff=j_offset)
-            LOGGER.debug(mask_reach.size)
 
             start_complete_queue.put(1)
             time.sleep(0.001)
@@ -429,6 +427,7 @@ def main():
         os.makedirs(dir_path, exist_ok=True)
     task_graph = taskgraph.TaskGraph(
         CHURN_DIR, multiprocessing.cpu_count()//4, 5.0)
+    #task_graph = taskgraph.TaskGraph(CHURN_DIR, -1)
     ecoshard_path_map = {}
 
     RASTER_ECOSHARD_URL_MAP.update({MASK_KEY: args.mask})
