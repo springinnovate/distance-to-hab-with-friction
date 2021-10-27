@@ -22,10 +22,12 @@ gdal.SetCacheMax(2**27)
 
 RASTER_ECOSHARD_URL_MAP = {
     # minutes/meter
-    'friction_surface': 'https://storage.googleapis.com/ecoshard-root/critical_natural_capital/friction_surface_2015_v1.0-002_md5_166d17746f5dd49cfb2653d721c2267c.tif',
+    #2015 -- 'friction_surface': 'https://storage.googleapis.com/ecoshard-root/critical_natural_capital/friction_surface_2015_v1.0-002_md5_166d17746f5dd49cfb2653d721c2267c.tif',
+    'friction_surface': 'https://storage.googleapis.com/ecoshard-root/friction_surface_2019_md5_35e63632ca653b98024aa8bd9c832684.tif',  # 2019
     'population_2017': 'https://storage.googleapis.com/ecoshard-root/population/lspop2017_md5_2e8da6824e4d67f8ea321ba4b585a3a5.tif',
     'lspop_2017_URCA_rural': 'https://storage.googleapis.com/ecoshard-root/population/lspop_2017_URCA_rural_md5_fe4ca0be95aa87a5e0ee6d7db83c0935.tif',
     'lspop_2017_URCA_urban': 'https://storage.googleapis.com/ecoshard-root/population/lspop_2017_URCA_urban_md5_ca344c73dfb71902ab99b4dca2a4a9fc.tif',
+    'population_2019': 'https://storage.googleapis.com/ecoshard-root/population/lspop2019_compressed_md5_d0bf03bd0a2378196327bbe6e898b70c.tif',
     #'habitat_mask': 'https://storage.googleapis.com/critical-natural-capital-ecoshards/habmasks/masked_all_nathab_wstreams_esa2015_nodata_md5_ee40334f1fc77bb1804d462c07261c86.tif',
     'world_borders': 'https://storage.googleapis.com/ecoshard-root/critical_natural_capital/TM_WORLD_BORDERS-0.3_simplified_md5_47f2059be8d4016072aa6abe77762021.gpkg',
 }
