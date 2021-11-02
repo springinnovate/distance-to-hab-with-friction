@@ -14,7 +14,7 @@ from ecoshard.geoprocessing.geoprocessing import _create_latitude_m2_area_column
 import numpy
 from osgeo import gdal
 import ecoshard
-import taskgraph
+from ecoshard import taskgraph
 
 import shortest_distances
 
@@ -23,7 +23,7 @@ gdal.SetCacheMax(2**27)
 RASTER_ECOSHARD_URL_MAP = {
     # minutes/meter
     #2015 -- 'friction_surface': 'https://storage.googleapis.com/ecoshard-root/critical_natural_capital/friction_surface_2015_v1.0-002_md5_166d17746f5dd49cfb2653d721c2267c.tif',
-    'friction_surface': 'https://storage.googleapis.com/ecoshard-root/friction_surface_2019_md5_35e63632ca653b98024aa8bd9c832684.tif',  # 2019
+    'friction_surface': 'https://storage.googleapis.com/ecoshard-root/ci_global_restoration/friction_surface_2019_compressed_md5_1be7dd230178a5d395529be7a5e3fb0a.tif',  # 2019
     'population_2017': 'https://storage.googleapis.com/ecoshard-root/population/lspop2017_md5_2e8da6824e4d67f8ea321ba4b585a3a5.tif',
     'lspop_2017_URCA_rural': 'https://storage.googleapis.com/ecoshard-root/population/lspop_2017_URCA_rural_md5_fe4ca0be95aa87a5e0ee6d7db83c0935.tif',
     'lspop_2017_URCA_urban': 'https://storage.googleapis.com/ecoshard-root/population/lspop_2017_URCA_urban_md5_ca344c73dfb71902ab99b4dca2a4a9fc.tif',
