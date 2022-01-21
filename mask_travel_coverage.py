@@ -69,8 +69,6 @@ SKIP_THESE_COUNTRIES = [
     'Kiribati',
     'Montserrat',
     'Pitcairn Islands',
-    'Rwanda',
-    'Senegal',
     'Saint Barthelemy',
     'Saint Martin',
     'Solomon Islands',
